@@ -1,52 +1,68 @@
 # InterviewIQ — AI Interview Agent
 
-An agentic AI system that conducts structured technical interviews end-to-end. HR uploads a job description and resume; the agent parses both, generates a tailored question bank, conducts a voice interview with the candidate, makes reasoned decisions at every step, and produces a full eligibility report.
+An end-to-end agentic AI system that conducts structured technical interviews. HR uploads a job description and resume; the agent parses both, generates a tailored question bank, conducts a live voice interview with the candidate, monitors progress in real time, and produces a full eligibility report — with visible reasoning at every step.
 
-**Runs entirely free** — Groq free tier for LLM and speech-to-text, browser built-in for text-to-speech.
+**Runs on free tiers** — Claude Agent SDK (via Claude Pro subscription) for all LLM reasoning, Groq Whisper (free tier) for speech-to-text, browser built-in SpeechSynthesis for text-to-speech.
 
 ---
 
-## How it works
+## What makes it agentic
+
+Most LLM integrations make a single API call and return a result. This system is different.
+
+The agent runs a **tool-calling loop** using the `@anthropic-ai/claude-agent-sdk`. Each time a candidate submits an answer, the agent doesn't just call one function — it reasons step by step, calls tools in sequence, and makes an autonomous decision about what to do next. The loop continues until the agent has called the right tools and arrived at a decision.
+
+**Every tool call includes a `reasoning` field** — the agent writes out its chain of thought before acting. This is logged to the backend terminal so you can see exactly why the agent made each decision.
+
+The agent operates across three phases:
 
 ```
-HR uploads JD + Resume
-        ↓
-  Agent parses documents
-  Agent plans interview strategy
-  Agent generates 8 tailored questions
-        ↓
-  Candidate answers each question (voice)
-        ↓
-  Agent evaluates each answer
-  Agent decides: follow-up? advance? end early?
-  Agent notes cross-question patterns
-        ↓
-  Agent writes final eligibility report
+SETUP PHASE                     INTERVIEW PHASE              REPORT PHASE
+─────────────────               ────────────────────         ────────────────
+parse_documents                 evaluate_answer              generate_final_report
+    ↓                               ↓                            (holistic review
+generate_question_bank          request_followup             of full conversation)
+    ↓                          OR advance_to_next_question
+Question bank ready (8 Qs)     OR conclude_interview_early
+                                PLUS (optionally)
+                                note_cumulative_concern
 ```
 
-The agent drives every decision using tool calls with visible reasoning — it is not hardcoded logic.
+The agent sees the **full interview history** on every answer submission — it doesn't process questions in isolation. This means it can notice patterns across questions, decide to probe a topic differently based on earlier answers, and build a holistic picture of the candidate.
 
 ---
 
 ## Prerequisites
 
+### Required
+
 - **Node.js 18+** — [nodejs.org](https://nodejs.org)
-- **A free Groq API key** — [console.groq.com](https://console.groq.com) (sign up, go to API Keys, create one)
+- **Claude Pro or Claude Code subscription** — the agent authenticates via OAuth token, not a pay-per-use API key
+- **Claude Code CLI** — install with `npm install -g @anthropic-ai/claude-code`, then run `claude setup-token` to generate your `CLAUDE_CODE_OAUTH_TOKEN`
+- **A free Groq API key** — [console.groq.com](https://console.groq.com) — used only for speech-to-text (Whisper)
 - A modern browser with microphone access (Chrome or Edge recommended)
 
-> **Optional:** A free Gemini API key from [aistudio.google.com](https://aistudio.google.com) if you want to use Gemini as the LLM provider instead.
+### Optional (alternative LLM providers)
+
+If you don't have Claude Pro, you can swap the LLM provider to Groq or Gemini (both free):
+
+- **Groq API key** — [console.groq.com](https://console.groq.com) — uses Llama 3.3 70B
+- **Gemini API key** — [aistudio.google.com](https://aistudio.google.com) — uses Gemini 2.5 Flash Lite
+
+> Note: When using Groq or Gemini as the LLM provider, the agent still calls tools the same way — but through an OpenAI-compatible client instead of the Claude Agent SDK. The `CLAUDE_CODE_OAUTH_TOKEN` is only needed when `LLM_PROVIDER=claude-sdk`.
 
 ---
 
 ## Setup
 
-### 1. Clone / open the project
+### 1. Clone the project
 
 ```bash
-cd interview-agent
+git clone https://github.com/PS-Shivam-Usturge/interviewiq.git
+cd interviewiq
 ```
 
-You should see two folders: `backend/` and `frontend/`.
+You will see two folders: `backend/` and `frontend/`.
 
 ---
 
@@ -63,13 +79,32 @@ Create your environment file:
 cp .env.example .env
 ```
 
-Open `.env` and fill in your Groq API key:
+Open `.env` and configure it. For the default Claude SDK setup:
 
 ```env
+# Run `claude setup-token` in your terminal to generate this
+CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-your-token-here
+
+# Free Groq key — used only for speech-to-text (Whisper)
 GROQ_API_KEY=gsk_your_key_here
-LLM_PROVIDER=groq
+
+# Use Claude Agent SDK for all LLM reasoning (default)
+LLM_PROVIDER=claude-sdk
+
 PORT=3001
 ```
+
+**Generating the OAuth token:**
+
+```bash
+# Install Claude Code CLI if you haven't already
+npm install -g @anthropic-ai/claude-code
+
+# Log in and generate your token
+claude setup-token
+```
+
+This opens a browser login flow with your Claude Pro / Claude Code account. Copy the `sk-ant-oat01-...` token it gives you into `.env`.
 
 Start the backend:
 
@@ -81,22 +116,15 @@ You should see:
 
 ```
   Interview Agent API → http://localhost:3001
-  LLM provider  : groq
+  LLM provider  : claude-sdk
   Health        : http://localhost:3001/api/health
-```
-
-Verify it is running:
-
-```bash
-curl http://localhost:3001/api/health
-# → {"status":"ok","provider":"groq","phase":3}
 ```
 
 ---
 
 ### 3. Frontend
 
-Open a **second terminal**, then:
+Open a **second terminal**:
 
 ```bash
 cd frontend
@@ -107,7 +135,7 @@ npm run dev
 You should see:
 
 ```
-  VITE ready in ~300ms
+  VITE ready
   ➜  Local: http://localhost:5173
 ```
 
@@ -115,48 +143,147 @@ Open **http://localhost:5173** in your browser.
 
 ---
 
+## Using an alternative LLM provider (no Claude Pro required)
+
+If you don't have a Claude Pro subscription, set `LLM_PROVIDER` to `groq` or `gemini` in `.env`:
+
+```env
+# Option A — Groq (Llama 3.3 70B, free tier)
+LLM_PROVIDER=groq
+GROQ_API_KEY=gsk_your_key_here
+
+# Option B — Gemini (Gemini 2.5 Flash Lite, free tier)
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=AIza_your_key_here
+```
+
+No code changes needed. The Groq key is still needed for speech-to-text regardless of which LLM provider you choose — Groq Whisper is the only STT option.
+
+---
+
 ## Running a full interview
 
-### Step 1 — Setup (HR side)
+### Step 1 — HR setup
 
 1. Open **http://localhost:5173**
-2. Upload a **Job Description** file (PDF, DOCX, or TXT)
-3. Upload a **Resume / CV** file (PDF, DOCX, or TXT)
+2. Upload a **Job Description** file (PDF, DOCX, or TXT — max 10 MB)
+3. Upload a **Resume / CV** file (PDF, DOCX, or TXT — max 10 MB)
 4. Select difficulty: `junior`, `mid`, `senior`, or `principal`
-5. Click **"Parse and Analyse"** — the agent reads both documents and shows a preview
-6. Click **"Start Interview"** — the agent generates 8 tailored questions
+5. Click **"Parse and Analyse"** — the agent reads both documents and shows a skills match preview
+6. Click **"Generate Candidate Link"** — the agent plans its interview strategy and generates 8 tailored questions
 
-You will get two links:
+You receive two links:
 - **Candidate link** — send this to the person being interviewed (`/interview/:id`)
-- **Monitor link** — keep this open to watch the interview live (`/monitor/:id`)
+- **HR monitor link** — keep this open in a separate tab to watch the interview live (`/monitor/:id`)
 
 ---
 
-### Step 2 — Interview (candidate side)
+### Step 2 — Candidate interview
 
-1. Open the candidate link in a browser **with microphone access**
-2. Read the welcome tips, then click **"Start Interview"**
-3. The browser reads each question aloud (text-to-speech)
-4. Click **"Start Recording"**, speak your answer, click **"Stop"**
-5. The agent evaluates the answer and either:
-   - Asks a follow-up question (if the answer needs more depth)
-   - Moves to the next question
-   - Ends the interview early (if it has gathered enough signal)
-6. After all questions, you reach the **Thank You** screen
+1. Open the candidate link in a browser with microphone access
+2. Read the welcome tips, then click **"Begin Interview"**
+3. The browser reads each question aloud (browser text-to-speech)
+4. Click **"Start Recording"**, speak the answer, the recording stops automatically after 4 seconds of silence
+5. The agent receives the transcript and decides:
+   - **Follow-up** — if the answer needs more depth (max once per question)
+   - **Advance** — accept the answer and move to the next question
+   - **Conclude early** — end the interview if there is strong enough evidence after 3+ questions
+6. After all questions (or early conclusion), the candidate reaches the Thank You screen
 
 ---
 
-### Step 3 — Report (HR side)
+### Step 3 — HR report
 
-1. Open the monitor link to watch scores and flags live during the interview
-2. After the interview completes, open **http://localhost:5173/report/:sessionId**
+1. After the candidate finishes, open **http://localhost:5173/report/:sessionId**
    - The session ID is shown on the setup page after starting the interview
-3. The agent reviews the entire interview conversation and generates a full eligibility report with:
-   - Overall score and category scores
-   - Recommendation (strong hire / hire / maybe / no hire)
-   - Strengths and gaps with evidence from actual answers
-   - Skill ratings
-   - Narrative and suggested next steps
+2. The agent reviews its full conversation history and generates a holistic eligibility report:
+   - Overall score and four category scores (technical, communication, problem-solving, culture fit)
+   - Recommendation: `strong_hire`, `hire`, `maybe`, or `no_hire`
+   - Strengths and gaps with evidence from specific answers
+   - Skill-by-skill ratings
+   - Full narrative and suggested next steps
+
+The report is generated once and cached — loading the page again does not re-run the LLM.
+
+---
+
+## Agentic architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Browser (HR)                            │
+│   Upload JD + Resume → Setup page → Monitor page → Report page  │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ HTTP
+┌───────────────────────────▼─────────────────────────────────────┐
+│                    Browser (Candidate)                           │
+│   /interview/:id — voice recording → Whisper STT → submit       │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ HTTP + SSE
+┌───────────────────────────▼─────────────────────────────────────┐
+│                   Express API  :3001                             │
+│  /api/parse   /api/session/start   /api/session/:id/answer       │
+│  /api/transcribe   /api/report   /api/monitor/:id (SSE)          │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                 ┌──────────▼──────────┐
+                 │   sessionManager    │
+                 │  DB reads/writes,   │
+                 │  API response shape │
+                 └──────────┬──────────┘
+                            │
+                 ┌──────────▼──────────────────────────────────┐
+                 │              interviewAgent.js               │
+                 │                                              │
+                 │  runAgentQuery()  →  Claude Agent SDK        │
+                 │  query() loop — tool calls with reasoning    │
+                 │                                              │
+                 │  SETUP:     parse_documents                  │
+                 │             generate_question_bank           │
+                 │                                              │
+                 │  INTERVIEW: evaluate_answer                  │
+                 │             request_followup /               │
+                 │             advance_to_next_question /       │
+                 │             conclude_interview_early         │
+                 │             note_cumulative_concern          │
+                 │                                              │
+                 │  REPORT:    generate_final_report            │
+                 └──────────┬───────────────────┬──────────────┘
+                            │                   │
+               ┌────────────▼──┐    ┌───────────▼───────────┐
+               │  Sub-agents   │    │      SQLite DB         │
+               │               │    │  sessions table:       │
+               │  parseAgent   │    │  - question_bank       │
+               │  questionAgent│    │  - agent_history       │
+               │  answerAgent  │    │  - agent_observations  │
+               │  reportAgent  │    │  answers table         │
+               └────────┬──────┘    │  reports table         │
+                        │           └────────────────────────┘
+               ┌────────▼──────┐
+               │    llm.js     │
+               │  Claude SDK   │
+               │  or Groq/     │
+               │  Gemini       │
+               └───────────────┘
+```
+
+### How agent state persists across HTTP requests
+
+Each HTTP request to `/api/session/:id/answer` is stateless from Express's point of view. The agent's continuity comes from SQLite:
+
+1. On every answer submission, `getSession()` loads the full `agent_history` (the complete LLM conversation so far) from the database
+2. The agent runs its tool-calling loop with that history as context — it knows everything that happened in prior turns
+3. After the loop completes, the updated `agent_history` and any new observations are saved back to SQLite
+4. The next answer submission starts the same way
+
+This is what gives the agent genuine memory across the interview — not just the current answer, but every prior question, answer, score, and reasoning note.
+
+### Follow-up enforcement
+
+The agent can request a follow-up on any question, but only once. This rule is enforced at two levels:
+
+1. **Prompt level** — the agent is instructed not to follow up a follow-up
+2. **Tool level** — the `request_followup` tool handler checks `context.lastWasFollowup` and overrides the decision to `advance` if the limit is already reached, even if the agent calls the tool anyway
 
 ---
 
@@ -166,165 +293,67 @@ All variables go in `backend/.env`.
 
 | Variable | Required | Description |
 |---|---|---|
-| `GROQ_API_KEY` | Yes (if using Groq) | From [console.groq.com](https://console.groq.com) |
-| `GEMINI_API_KEY` | Yes (if using Gemini) | From [aistudio.google.com](https://aistudio.google.com) |
-| `LLM_PROVIDER` | Yes | `groq` or `gemini` |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Yes (if `LLM_PROVIDER=claude-sdk`) | Generated by `claude setup-token`. Authenticates via Claude Pro — no separate API billing. |
+| `GROQ_API_KEY` | Yes | From [console.groq.com](https://console.groq.com). Used for Whisper STT on every interview. Also used as LLM if `LLM_PROVIDER=groq`. |
+| `GEMINI_API_KEY` | Only if `LLM_PROVIDER=gemini` | From [aistudio.google.com](https://aistudio.google.com) |
+| `LLM_PROVIDER` | No | `claude-sdk` (default), `groq`, or `gemini` |
 | `PORT` | No | Backend port, defaults to `3001` |
-
-**Which provider should I use?**
-
-Use `groq` — it is faster and the free tier is generous. Groq also powers the speech-to-text (Whisper) regardless of which LLM provider you choose.
-
----
-
-## Project structure
-
-```
-interview-agent/
-├── backend/
-│   ├── server.js                 # Express entry point, routes, health check
-│   ├── llm.js                    # LLM client — chat() and chatWithTools() for Groq/Gemini
-│   ├── .env.example              # Copy to .env
-│   ├── agents/
-│   │   ├── interviewAgent.js     # Master agent — tool-calling loop, all decisions
-│   │   ├── sessionManager.js     # Session lifecycle — DB persistence, API responses
-│   │   ├── parseAgent.js         # Tool: parse JD and resume into structured JSON
-│   │   ├── questionAgent.js      # Tool: generate tailored question bank
-│   │   ├── answerAgent.js        # Tool: score and evaluate candidate answers
-│   │   ├── reportAgent.js        # Tool: generate eligibility report
-│   │   └── parser.js             # File text extraction (PDF, DOCX, TXT)
-│   ├── db/
-│   │   ├── database.js           # SQLite schema and migrations
-│   │   └── sessionStore.js       # All database read/write operations
-│   └── routes/
-│       ├── parse.js              # POST /api/parse
-│       ├── session.js            # POST /api/session/start, POST /api/session/:id/answer
-│       ├── report.js             # GET /api/report/:sessionId
-│       ├── transcribe.js         # POST /api/transcribe (Groq Whisper STT)
-│       └── monitor.js            # GET /api/monitor/:sessionId (SSE live feed)
-│
-└── frontend/
-    └── src/
-        ├── pages/
-        │   ├── SetupPage.jsx     # HR: upload files, start interview, get links
-        │   ├── InterviewPage.jsx # Candidate: voice interview loop
-        │   ├── MonitorPage.jsx   # HR: live scores and transcript feed
-        │   ├── ReportPage.jsx    # HR: final eligibility report
-        │   └── ThankYouPage.jsx  # Candidate: end screen
-        ├── components/
-        │   ├── FileDropZone.jsx  # Drag-and-drop file upload
-        │   └── ParsePreview.jsx  # Parsed JD + resume preview cards
-        └── hooks/
-            └── useVoiceRecorder.js  # MediaRecorder + silence detection
-```
 
 ---
 
 ## Agent tools reference
 
-The interview agent has 8 tools it can call. Each call includes a `reasoning` field — the agent's visible chain of thought.
+The agent has 8 tools across three phases. Each tool call includes a `reasoning` field — the agent's written explanation before it acts.
 
 | Tool | Phase | What it does |
 |---|---|---|
-| `parse_documents` | Setup | Extracts structured info from JD and resume |
-| `generate_question_bank` | Setup | Creates 8 tailored questions with a stated interview strategy |
-| `evaluate_answer` | Per answer | Scores the answer (technical / communication / depth) and identifies flags |
-| `request_followup` | Per answer | Asks a follow-up when the answer needs more depth (max once per question) |
-| `advance_to_next_question` | Per answer | Accepts the answer and moves on, with a verdict |
-| `conclude_interview_early` | Per answer | Ends the interview when enough signal is gathered across 3+ questions |
-| `note_cumulative_concern` | Per answer | Records a cross-question pattern to highlight in the report |
-| `generate_final_report` | Report | Writes the final eligibility report with holistic reasoning |
-
----
-
-## Switching LLM provider
-
-In `backend/.env`:
-
-```env
-# Groq (recommended — faster, free)
-LLM_PROVIDER=groq
-GROQ_API_KEY=gsk_...
-
-# Gemini (alternative — also free)
-LLM_PROVIDER=gemini
-GEMINI_API_KEY=AIza...
-```
-
-No code changes needed. Speech-to-text always uses Groq Whisper regardless of `LLM_PROVIDER`.
-
----
-
-## Troubleshooting
-
-**Backend won't start — `GROQ_API_KEY` error**
-- Make sure you created `backend/.env` (not just `.env.example`)
-- Check the key starts with `gsk_`
-
-**`npm run dev` fails with ES module error**
-- You need Node.js 18 or higher: `node --version`
-
-**Microphone not working in interview**
-- Use Chrome or Edge
-- The page must be served from `localhost` (not a file path)
-- Allow microphone access when the browser prompts
-
-**Speech is not playing (no audio)**
-- The interview uses your browser's built-in text-to-speech
-- Check your system volume and that the browser is not muted
-- On some Linux systems, install `espeak`: `sudo apt install espeak`
-
-**Interview page shows "Session not found"**
-- The session ID in the URL must match one created in the current run
-- If you restarted the backend, old session IDs are still valid (SQLite persists to `backend/interview.db`)
-
-**Report page is empty or errors**
-- The interview must be fully completed (candidate reaches Thank You screen) before the report can be generated
-- Check backend terminal for error details
-
-**Rate limit errors from Groq (429)**
-- Groq free tier has per-minute limits; the backend retries automatically up to 4 times with backoff
-- If it keeps failing, wait 60 seconds and try again
-- Running multiple interviews simultaneously will hit limits faster
+| `parse_documents` | Setup | Extracts structured information from the JD and resume — role requirements, required skills, candidate background, years of experience |
+| `generate_question_bank` | Setup | Creates 8 tailored questions with a stated interview strategy, focus areas, and intended depth per question |
+| `evaluate_answer` | Per answer | Scores the answer across technical (0–10), communication (0–10), and depth (0–10) dimensions; identifies flags like `vague`, `evasive`, `contradicts_resume` |
+| `request_followup` | Per answer | Asks a follow-up when the answer needs more depth — limited to once per original question; overridden automatically if the limit is already reached |
+| `advance_to_next_question` | Per answer | Accepts the answer with a verdict (`strong`, `adequate`, `weak`, or `concerning`) and moves to the next question |
+| `conclude_interview_early` | Per answer | Ends the interview early when there is strong cross-question evidence — requires at least 3 answered questions, blocked otherwise |
+| `note_cumulative_concern` | Per answer | Records a recurring pattern that spans multiple answers (e.g. "candidate avoids specifics whenever implementation is probed") for the final report |
+| `generate_final_report` | Report | Reviews the entire interview conversation holistically and writes the eligibility report with scores, recommendation, strengths, gaps, and narrative |
 
 ---
 
 ## API endpoints
 
-All endpoints are served from `http://localhost:3001`.
+All endpoints served from `http://localhost:3001`.
 
 ### `GET /api/health`
-Returns server status and active LLM provider.
+
 ```json
-{ "status": "ok", "provider": "groq", "phase": 3 }
+{ "status": "ok", "provider": "claude-sdk", "phase": 3 }
 ```
 
 ---
 
 ### `POST /api/parse`
+
 Parses uploaded JD and resume files. Accepts `multipart/form-data`.
 
-**Fields:** `jd` (file), `resume` (file)
-**Accepted formats:** PDF, DOCX, TXT — max 10 MB each
+**Fields:** `jd` (file), `resume` (file) — PDF, DOCX, or TXT, max 10 MB each
 
 **Response:**
 ```json
 {
-  "jdText": "raw text...",
-  "resumeText": "raw text...",
-  "jdSummary": {
-    "role_title": "Senior Backend Engineer",
-    "seniority_level": "senior",
-    "required_skills": ["Node.js", "PostgreSQL"],
-    "tech_stack": ["AWS", "Docker"],
-    "summary": "..."
+  "jd": {
+    "raw": "full extracted text...",
+    "summary": {
+      "role_title": "Senior Backend Engineer",
+      "required_skills": ["Node.js", "PostgreSQL"],
+      "tech_stack": ["AWS", "Docker"]
+    }
   },
-  "resumeSummary": {
-    "candidate_name": "Jane Smith",
-    "current_title": "Software Engineer",
-    "years_total_experience": 5,
-    "skills": ["Node.js", "React"],
-    "summary": "..."
+  "resume": {
+    "raw": "full extracted text...",
+    "summary": {
+      "candidate_name": "Jane Smith",
+      "years_total_experience": 5,
+      "skills": ["Node.js", "React"]
+    }
   }
 }
 ```
@@ -332,7 +361,8 @@ Parses uploaded JD and resume files. Accepts `multipart/form-data`.
 ---
 
 ### `POST /api/session/start`
-Starts a new interview session. The agent parses documents, plans its strategy, and generates the question bank.
+
+Runs the agent's setup phase — parses documents, generates the question bank.
 
 **Body:**
 ```json
@@ -353,15 +383,13 @@ Starts a new interview session. The agent parses documents, plans its strategy, 
   "totalQuestions": 8,
   "currentIndex": 0,
   "currentQuestion": {
-    "id": "o1",
     "category": "opening",
-    "question": "Walk me through your experience with...",
-    "intent": "Assess depth of hands-on experience"
+    "question": "Walk me through your experience with..."
   },
   "status": "active",
   "agentSetup": {
     "focusAreas": ["distributed systems", "API design"],
-    "agentSummary": "Interview ready. Candidate claims strong backend experience..."
+    "agentSummary": "Interview ready — candidate claims strong backend experience..."
   }
 }
 ```
@@ -369,66 +397,51 @@ Starts a new interview session. The agent parses documents, plans its strategy, 
 ---
 
 ### `POST /api/session/:id/answer`
-Submits a candidate's answer. The agent evaluates it and decides the next step.
 
-**Body:**
-```json
-{ "transcript": "I have worked with Node.js for three years..." }
-```
+Submits a candidate's transcript. The agent evaluates it and decides the next step.
+
+**Body:** `{ "transcript": "I have worked with Node.js for three years..." }`
 
 **Response:**
 ```json
 {
-  "answeredQuestion": "Walk me through...",
   "answerAnalysis": {
-    "scores": { "technical": 7, "communication": 8, "depth": 6, "overall": 7 },
+    "scores": { "technical": 7, "communication": 8, "depth": 6 },
     "flags": [],
-    "analysis": "Solid overview with concrete examples...",
-    "strengthPoints": ["Clear structure", "Mentioned specific tools"],
-    "gapPoints": ["Did not address error handling"]
+    "analysis": "Solid overview with concrete examples..."
   },
   "agentDecision": {
     "action": "request_followup",
-    "reasoning": "Candidate described the concept correctly but gave no real-world example of handling failures at scale",
-    "followUpQuestion": "Can you describe a specific incident where a service failed and how you recovered it?",
-    "observations": [],
-    "toolEvents": [ ... ]
+    "reasoning": "Candidate described the concept correctly but gave no real-world failure example",
+    "followUpQuestion": "Can you describe a specific incident where a service failed and how you recovered it?"
   },
   "isFollowUp": true,
   "isComplete": false,
-  "concludedEarly": false,
   "nextQuestion": { "category": "follow_up", "question": "Can you describe..." },
-  "nextIndex": 0,
   "progress": { "current": 1, "total": 8, "percent": 0 }
 }
 ```
 
-**`agentDecision.action`** can be:
-- `"request_followup"` — agent wants more depth on this question
+`agentDecision.action` is one of:
+- `"request_followup"` — agent wants more depth
 - `"advance"` — agent accepted the answer and moved on
-- `"conclude_early"` — agent ended the interview early with sufficient evidence
-
----
-
-### `GET /api/session/:id`
-Returns current session state. Used by the interview room and HR monitor to poll progress.
+- `"conclude_early"` — agent ended the interview with sufficient cross-question evidence
 
 ---
 
 ### `POST /api/transcribe`
-Transcribes an audio recording using Groq Whisper. Accepts `multipart/form-data`.
 
-**Fields:** `audio` (file — WebM/OGG from MediaRecorder)
+Transcribes an audio recording using Groq Whisper.
 
-**Response:**
-```json
-{ "transcript": "I have been working with React for two years..." }
-```
+**Field:** `audio` (WebM/OGG from MediaRecorder)
+
+**Response:** `{ "transcript": "I have been working with React for two years..." }`
 
 ---
 
 ### `GET /api/report/:sessionId`
-Generates (or returns cached) the final eligibility report. The agent reviews its full interview conversation history and writes a holistic report.
+
+Generates (or returns cached) the final eligibility report.
 
 **Response:**
 ```json
@@ -439,7 +452,6 @@ Generates (or returns cached) the final eligibility report. The agent reviews it
   "problem_solving_score": 70,
   "culture_fit_score": 75,
   "recommendation": "hire",
-  "confidence": "medium",
   "headline": "Solid mid-level candidate with strong communication but gaps in system design",
   "strengths": ["Clear communicator", "Solid React fundamentals"],
   "gaps": ["Thin on distributed systems", "No mention of testing practices"],
@@ -447,31 +459,80 @@ Generates (or returns cached) the final eligibility report. The agent reviews it
   "skill_ratings": [
     { "skill": "Node.js", "rating": 4, "evidence": "Described async patterns correctly in Q3" }
   ],
-  "narrative": "Jane demonstrated...",
-  "suggested_next_steps": ["Technical assessment on system design", "Reference check"]
+  "narrative": "Jane demonstrated..."
 }
 ```
 
 ---
 
-### `GET /api/monitor/:sessionId`
-Server-Sent Events (SSE) stream for the HR live monitor. Pushes session state every 2 seconds.
+### `GET /api/monitor/:sessionId` (SSE)
 
-Connect with:
+Server-Sent Events stream for the HR live monitor — pushes session state every 2 seconds.
+
 ```js
 const es = new EventSource(`http://localhost:3001/api/monitor/${sessionId}`);
 es.onmessage = (e) => console.log(JSON.parse(e.data));
+```
+
+Each event includes: current question, progress, all completed answers with scores, and the candidate's live transcript as they speak.
+
+### `POST /api/monitor/:sessionId/live`
+
+Called by the interview frontend after Whisper transcription to push the candidate's words to the HR monitor in real time.
+
+---
+
+## Project structure
+
+```
+interviewiq/
+├── backend/
+│   ├── server.js               # Express entry point, CORS, route registration
+│   ├── llm.js                  # LLM routing — Claude SDK (default) or Groq/Gemini
+│   ├── .env.example            # Copy to .env, fill in keys
+│   ├── agents/
+│   │   ├── interviewAgent.js   # Core agent — tool definitions, query() loop, all three phases
+│   │   ├── sessionManager.js   # Session lifecycle — DB reads, API response shaping
+│   │   ├── parseAgent.js       # Summarises JD and resume into structured JSON
+│   │   ├── questionAgent.js    # Generates 8 tailored questions with metadata
+│   │   ├── answerAgent.js      # Scores answers (technical/communication/depth) + flags
+│   │   ├── reportAgent.js      # Generates and caches eligibility report
+│   │   └── parser.js           # File text extraction (pdf-parse + mammoth)
+│   ├── db/
+│   │   ├── database.js         # LibSQL init, 3-table schema, auto-migration on startup
+│   │   └── sessionStore.js     # All DB CRUD: createSession, getSession, saveAnswer, etc.
+│   └── routes/
+│       ├── parse.js            # POST /api/parse
+│       ├── session.js          # POST /api/session/start, POST /api/session/:id/answer
+│       ├── report.js           # GET /api/report/:sessionId
+│       ├── transcribe.js       # POST /api/transcribe (Groq Whisper)
+│       └── monitor.js          # GET /api/monitor/:sessionId (SSE) + POST live transcript
+│
+└── frontend/
+    └── src/
+        ├── main.jsx                 # React Router — 5 routes
+        ├── index.css                # Dark design system with CSS variables
+        ├── pages/
+        │   ├── SetupPage.jsx        # HR: upload → parse preview → generate session → share links
+        │   ├── InterviewPage.jsx    # Candidate: TTS question → voice recording → submit loop
+        │   ├── MonitorPage.jsx      # HR: SSE live feed — transcript, running scores, flag tally
+        │   ├── ReportPage.jsx       # HR: score rings, strengths/gaps, skill ratings, print export
+        │   └── ThankYouPage.jsx     # Candidate: end screen (no scores shown)
+        ├── components/
+        │   ├── FileDropZone.jsx     # Drag-and-drop file upload
+        │   └── ParsePreview.jsx     # JD + resume preview cards with skills match bar
+        └── hooks/
+            └── useVoiceRecorder.js  # MediaRecorder + silence detection (4s / RMS 0.01) + Whisper call
 ```
 
 ---
 
 ## Database
 
-The backend creates a SQLite database at `backend/interview.db` automatically on first run. You do not need to set anything up.
+SQLite database is created automatically at `backend/interview.db` on first run.
 
-**Three tables:**
+### `sessions` table — one row per interview
 
-**`sessions`** — one row per interview
 | Column | Description |
 |---|---|
 | `id` | UUID, primary key |
@@ -481,24 +542,26 @@ The backend creates a SQLite database at `backend/interview.db` automatically on
 | `difficulty` | junior / mid / senior / principal |
 | `status` | ready → active → completed |
 | `question_bank` | JSON array of 8 questions |
-| `current_question_index` | Which question is active |
-| `last_was_followup` | 1 if current turn is a follow-up answer |
-| `followup_count` | Follow-ups used on current question |
-| `agent_history` | JSON — full LLM conversation history |
-| `agent_observations` | JSON — cross-question concerns noted by agent |
-| `concluded_early` | 1 if agent ended the interview before all questions |
+| `current_question_index` | Index of the active question |
+| `last_was_followup` | 1 if the current turn is answering a follow-up |
+| `followup_count` | Follow-ups used on the current question |
+| `agent_history` | JSON — full LLM conversation history (replayed each request) |
+| `agent_observations` | JSON — cross-question concerns noted by the agent |
+| `concluded_early` | 1 if the agent ended the interview before all questions |
 
-**`answers`** — one row per question answered
+### `answers` table — one row per question answered
+
 | Column | Description |
 |---|---|
 | `session_id` | Foreign key to sessions |
-| `question_index` | Which question this answer is for |
+| `question_index` | Which question this is for |
 | `transcript` | What the candidate said |
 | `score_technical` / `score_communication` / `score_depth` | 0–10 scores |
-| `flags` | JSON array — vague, evasive, contradicts_resume, etc. |
-| `analysis` | Agent's written evaluation + decision reasoning |
+| `flags` | JSON array — `vague`, `evasive`, `contradicts_resume`, etc. |
+| `analysis` | Agent's written evaluation and decision reasoning |
 
-**`reports`** — one row per completed session
+### `reports` table — one row per completed session
+
 | Column | Description |
 |---|---|
 | `session_id` | Foreign key to sessions |
@@ -507,60 +570,20 @@ The backend creates a SQLite database at `backend/interview.db` automatically on
 | `strengths` / `gaps` / `red_flags` | JSON arrays |
 | `narrative` | Agent's full written assessment |
 
-To inspect the database directly:
+**To inspect the database:**
 ```bash
-# Install sqlite3 if needed: brew install sqlite3 / apt install sqlite3
 sqlite3 backend/interview.db
-
 sqlite> .tables
 sqlite> SELECT id, candidate_name, status FROM sessions;
 sqlite> SELECT question, score_technical, analysis FROM answers WHERE session_id = 'your-id';
 sqlite> .quit
 ```
 
-To reset the database (delete all sessions):
+**To reset (delete all sessions):**
 ```bash
 rm backend/interview.db
-# Restart the backend — it will recreate the schema automatically
+# Restart backend — schema recreates automatically
 ```
-
----
-
-## Architecture overview
-
-```
-Browser (candidate)          Browser (HR)
-      │                           │
-      │ voice recording           │ file upload / monitor
-      ▼                           ▼
-┌─────────────────────────────────────────┐
-│           Express API  :3001            │
-│  /transcribe  /session  /parse  /report │
-└─────────────────┬───────────────────────┘
-                  │
-          sessionManager.js
-          (DB reads/writes,
-           response shaping)
-                  │
-          interviewAgent.js  ◄── agent_history (SQLite)
-          (tool-calling loop,
-           all decisions)
-                  │
-     ┌────────────┼──────────────┐
-     │            │              │
-parseAgent   answerAgent    reportAgent
-questionAgent               (cached)
-     │
-  llm.js
-  (Groq / Gemini via
-   OpenAI-compat API)
-```
-
-**Key design decisions:**
-- The agent's entire conversation history is persisted in SQLite between HTTP requests. This is what makes it stateful — each answer submission loads the full history, adds to it, and saves it back.
-- Speech-to-text is always Groq Whisper regardless of `LLM_PROVIDER`, because Whisper is only available on Groq.
-- Text-to-speech uses the browser's built-in `SpeechSynthesis` API — no API key or internet required.
-- The report is generated lazily (only when HR requests it) and cached — requesting it twice does not run the LLM twice.
 
 ---
 
@@ -570,19 +593,67 @@ questionAgent               (cached)
 |---|---|
 | Frontend | React 18, Vite, React Router v6 |
 | Backend | Node.js (ESM), Express 4 |
-| LLM | Groq (`llama-3.3-70b-versatile`) or Gemini (`gemini-2.5-flash-lite`) |
-| Speech-to-text | Groq Whisper (`whisper-large-v3-turbo`) |
-| Text-to-speech | Browser `SpeechSynthesis` API |
+| Agent orchestration | `@anthropic-ai/claude-agent-sdk` — tool-calling loop via Claude Code OAuth |
+| LLM (default) | Claude (via Claude Pro subscription + OAuth token) |
+| LLM (alternative) | Groq `llama-3.3-70b-versatile` or Gemini `gemini-2.5-flash-lite` |
+| Speech-to-text | Groq Whisper `whisper-large-v3-turbo` (always Groq, regardless of LLM provider) |
+| Text-to-speech | Browser `SpeechSynthesis` API — no API key or internet required |
 | Database | SQLite via `@libsql/client` |
 | File parsing | `pdf-parse` (PDF), `mammoth` (DOCX) |
+| Schema validation | Zod (tool parameter definitions) |
+
+---
+
+## Troubleshooting
+
+**Backend won't start — `CLAUDE_CODE_OAUTH_TOKEN` error**
+- Run `claude setup-token` to generate a fresh token
+- Make sure `CLAUDE_CODE_OAUTH_TOKEN` is set in `backend/.env` (not `.env.example`)
+- Token starts with `sk-ant-oat01-`
+
+**`claude setup-token` not found**
+- Install Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
+- If you don't have Claude Pro, set `LLM_PROVIDER=groq` and skip the OAuth token
+
+**Backend won't start — `GROQ_API_KEY` missing**
+- Get a free key at [console.groq.com](https://console.groq.com)
+- Groq is always required for Whisper STT, even when using Claude as the LLM
+
+**`npm run dev` fails with ES module error**
+- You need Node.js 18 or higher: `node --version`
+
+**Microphone not working**
+- Use Chrome or Edge
+- The page must be served from `localhost` (not a file path)
+- Click "Allow" when the browser prompts for mic access
+
+**Speech not playing**
+- The interview uses your browser's built-in text-to-speech — check system volume
+- On Linux: `sudo apt install espeak` may be needed
+
+**Interview page shows blank after an answer**
+- Check the browser console for errors
+- Ensure the backend is running and `GROQ_API_KEY` is valid (Whisper needs it to transcribe)
+
+**Interview page shows "Session not found"**
+- If you restarted the backend, old session IDs are still valid (SQLite persists across restarts)
+- The candidate URL must match a session created from the setup page
+
+**Report page errors**
+- The interview must be fully completed (candidate reaches the Thank You screen) before the report can be generated
+- Check the backend terminal for error details
+
+**Rate limit errors from Groq (429)**
+- Groq free tier has per-minute limits; the backend retries automatically up to 4 times with backoff
+- If retries are exhausted, wait 60 seconds and try again
+- Running multiple interviews simultaneously will hit limits faster
 
 ---
 
 ## Known limitations
 
-- **Single user per session** — there is no authentication. Anyone with the session URL can submit answers or view the report. Suitable for local/demo use only.
-- **No concurrent session protection** — if two people submit answers to the same session simultaneously, the agent history may get corrupted.
-- **Groq free tier rate limits** — heavy use (multiple simultaneous interviews) will hit rate limits. The backend retries automatically but very high volume is not supported.
-- **Browser TTS quality** — the built-in speech synthesis voice varies by OS. Windows and macOS have good voices; Linux may sound robotic. Consider ElevenLabs or similar for production use.
-- **8-question limit** — the question bank is always 8 questions. The agent may conclude early but cannot extend beyond 8.
-- **No file storage** — uploaded files are processed in memory and not saved to disk. The extracted text is stored in the database.
+- **No authentication** — anyone with the session URL can view or interact with the session. Suitable for local and demo use only.
+- **No concurrent answer protection** — if two requests submit answers to the same session simultaneously, the agent history may be corrupted.
+- **8-question limit** — the question bank is always 8 questions. The agent may conclude early but cannot go beyond 8.
+- **Browser TTS quality varies** — Windows and macOS have natural-sounding voices; Linux may sound robotic.
+- **Files not stored on disk** — uploaded JD/resume files are processed in memory and not saved. The extracted text is stored in SQLite.
