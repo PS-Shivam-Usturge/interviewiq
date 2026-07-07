@@ -11,12 +11,15 @@ const router = express.Router();
 router.get("/report/:sessionId", async (req, res) => {
   const { sessionId } = req.params;
   try {
+    const session = await getSession(sessionId);
+    if (!session) return res.status(404).json({ error: "Session not found" });
+    if (session.status !== "completed") {
+      return res.status(400).json({ error: "Interview is not yet completed — report cannot be generated until the candidate finishes." });
+    }
+
     // Return cached report immediately — report generation is expensive
     const cached = await getStoredReport(sessionId);
     if (cached) return res.json(cached);
-
-    const session = await getSession(sessionId);
-    if (!session) return res.status(404).json({ error: "Session not found" });
 
     const result = await generateAgentReport({ sessionId, session });
 

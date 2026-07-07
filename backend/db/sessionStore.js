@@ -90,42 +90,28 @@ export async function completeSession(sessionId) {
 export async function saveAnswer({
   sessionId, questionIndex, question, questionCategory,
   transcript, scoreTechnical, scoreCommunication, scoreDepth,
+  overallScore, strengthPoints, gapPoints,
   flags, analysis,
 }) {
   await db.execute({
     sql: `INSERT INTO answers
           (session_id, question_index, question, question_category,
-           transcript, score_technical, score_communication, score_depth, flags, analysis)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           transcript, score_technical, score_communication, score_depth,
+           overall_score, strength_points, gap_points, flags, analysis)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       sessionId, questionIndex, question, questionCategory || "general",
       transcript,
-      scoreTechnical    || 0,
-      scoreCommunication|| 0,
-      scoreDepth        || 0,
-      JSON.stringify(flags || []),
+      scoreTechnical     || 0,
+      scoreCommunication || 0,
+      scoreDepth         || 0,
+      overallScore       || 0,
+      JSON.stringify(strengthPoints || []),
+      JSON.stringify(gapPoints      || []),
+      JSON.stringify(flags          || []),
       analysis || "",
     ],
   });
-}
-
-// ── Agent history ─────────────────────────────────────────────────────────────
-
-export async function saveAgentHistory(sessionId, messages) {
-  await db.execute({
-    sql: "UPDATE sessions SET agent_history = ? WHERE id = ?",
-    args: [JSON.stringify(messages), sessionId],
-  });
-}
-
-export async function getAgentHistory(sessionId) {
-  const result = await db.execute({
-    sql: "SELECT agent_history FROM sessions WHERE id = ?",
-    args: [sessionId],
-  });
-  const raw = result.rows[0]?.agent_history;
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch { return null; }
 }
 
 export async function appendAgentObservations(sessionId, newObservations) {

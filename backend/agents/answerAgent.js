@@ -10,8 +10,8 @@ export async function analyseAnswer({ question, answer, questionCategory, jdSumm
       overall_score:       0,
       flags:               ["no_answer"],
       analysis:            "Candidate did not provide a meaningful answer.",
-      follow_up_needed:    true,
-      follow_up_reason:    "no_answer",
+      strength_points:     [],
+      gap_points:          ["No answer given"],
     };
   }
 
@@ -35,9 +35,7 @@ Return JSON with this exact structure:
   "strength_points": ["what the candidate did well"],
   "gap_points": ["what was missing or weak"],
   "flags": <array of zero or more: "vague", "inaccurate", "contradicts_resume", "no_examples", "overconfident", "underconfident", "evasive">,
-  "analysis": "2-3 sentence plain English evaluation of this answer",
-  "follow_up_needed": <true if answer was weak or incomplete, false otherwise>,
-  "follow_up_reason": <"weak_answer" | "needs_clarification" | "impressive_go_deeper" | null>
+  "analysis": "2-3 sentence plain English evaluation of this answer"
 }`;
 
   const content = await agentQuery(prompt);

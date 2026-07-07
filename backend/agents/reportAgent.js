@@ -85,8 +85,9 @@ async function storeReport(sessionId, report) {
     sql: `INSERT OR REPLACE INTO reports
           (session_id, overall_score, technical_score, communication_score,
            problem_solving_score, culture_fit_score,
-           strengths, gaps, red_flags, recommendation, narrative)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           strengths, gaps, red_flags, recommendation, narrative,
+           headline, confidence, skill_ratings, suggested_next_steps)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       sessionId,
       report.overall_score,
@@ -94,11 +95,15 @@ async function storeReport(sessionId, report) {
       report.communication_score,
       report.problem_solving_score,
       report.culture_fit_score,
-      JSON.stringify(report.strengths),
-      JSON.stringify(report.gaps),
-      JSON.stringify(report.red_flags),
+      JSON.stringify(report.strengths           || []),
+      JSON.stringify(report.gaps                || []),
+      JSON.stringify(report.red_flags           || []),
       report.recommendation,
       report.narrative,
+      report.headline                           || null,
+      report.confidence                         || null,
+      JSON.stringify(report.skill_ratings       || []),
+      JSON.stringify(report.suggested_next_steps|| []),
     ],
   });
 }
@@ -112,9 +117,11 @@ export async function getStoredReport(sessionId) {
   const r = res.rows[0];
   return {
     ...r,
-    strengths: safeJson(r.strengths),
-    gaps:      safeJson(r.gaps),
-    red_flags: safeJson(r.red_flags),
+    strengths:            safeJson(r.strengths),
+    gaps:                 safeJson(r.gaps),
+    red_flags:            safeJson(r.red_flags),
+    skill_ratings:        safeJson(r.skill_ratings),
+    suggested_next_steps: safeJson(r.suggested_next_steps),
   };
 }
 

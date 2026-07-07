@@ -114,6 +114,9 @@ export async function submitAnswer({ sessionId, transcript }) {
     scoreTechnical:     evaluation.score_technical     || 0,
     scoreCommunication: evaluation.score_communication || 0,
     scoreDepth:         evaluation.score_depth         || 0,
+    overallScore:       evaluation.overall_score       || 0,
+    strengthPoints:     evaluation.strength_points     || [],
+    gapPoints:          evaluation.gap_points          || [],
     flags:              evaluation.flags               || [],
     analysis:           buildAnalysisText(evaluation, decision),
   });

@@ -75,22 +75,3 @@ Rules:
   return ordered;
 }
 
-// ── Adaptive follow-up ─────────────────────────────────────────────────────────
-
-export async function generateAdaptiveFollowUp({ question, answer, score, followUps }) {
-  // Use pre-generated follow-ups first (no extra LLM call)
-  if (followUps?.length) {
-    return score >= 7 ? followUps[0] : followUps[1] || followUps[0];
-  }
-
-  // Fallback: generate dynamically via Claude Agent SDK
-  const direction = score >= 7 ? "harder and more advanced" : "simpler and more clarifying";
-  const prompt = `You are a technical interviewer. Return only the follow-up question text, nothing else.
-
-Original question: "${question}"
-Candidate answer: "${answer.slice(0, 400)}"
-Score: ${score}/10 — generate one ${direction} follow-up question.`;
-
-  const content = await agentQuery(prompt);
-  return content.trim();
-}

@@ -49,10 +49,13 @@ router.post(
         });
       }
 
-      // Sequential calls — Gemini free tier rate limit is per-minute,
-      // parallel requests trip it immediately. JD first, then resume.
-      const jdSummary = await summariseJD(jdRaw);
-      const resumeSummary = await summariseResume(resumeRaw);
+      // Parallel calls — safe for claude-sdk and groq providers.
+      // If using LLM_PROVIDER=gemini, free-tier rate limits may cause a 429;
+      // the retry logic in llm.js will handle it with backoff.
+      const [jdSummary, resumeSummary] = await Promise.all([
+        summariseJD(jdRaw),
+        summariseResume(resumeRaw),
+      ]);
 
       res.json({
         jd: { raw: jdRaw, summary: jdSummary },

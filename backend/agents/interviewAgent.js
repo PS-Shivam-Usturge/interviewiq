@@ -50,29 +50,11 @@ function createInterviewTools(context) {
   return [
     tool(
       "evaluate_answer",
-      "Score and analyse the candidate's answer to the current question. Always call this first when processing an answer.",
+      "Review the pre-computed evaluation scores and analysis for the candidate's answer. Always call this first to understand the answer quality before deciding on follow-up or advance.",
       { reasoning: z.string().describe("Your immediate, specific assessment — what the candidate demonstrated and what was missing") },
       async ({ reasoning: _reasoning }) => {
-        try {
-          const evaluation = await analyseAnswer({
-            question:         context.currentQuestion.question,
-            answer:           context.transcript,
-            questionCategory: context.currentQuestion.category,
-            jdSummary:        context.jdSummary,
-            resumeSummary:    context.resumeSummary,
-          });
-          context.evaluation = evaluation;
-          return { content: [{ type: "text", text: JSON.stringify(evaluation) }] };
-        } catch (err) {
-          const fallback = {
-            score_technical: 0, score_communication: 0, score_depth: 0, overall_score: 0,
-            flags: ["evaluation_error"], analysis: `Evaluation failed: ${err.message}`,
-            follow_up_needed: false, follow_up_reason: null,
-            strength_points: [], gap_points: [],
-          };
-          context.evaluation = fallback;
-          return { content: [{ type: "text", text: JSON.stringify(fallback) }] };
-        }
+        // evaluation is pre-computed before the agent loop — no extra LLM call needed
+        return { content: [{ type: "text", text: JSON.stringify(context.evaluation) }] };
       },
       { annotations: { readOnlyHint: true } }
     ),
@@ -123,7 +105,7 @@ function createInterviewTools(context) {
       },
       async ({ reasoning, preliminary_verdict }) => {
         const answeredSoFar = context.currentIndex ?? 0;
-        if (answeredSoFar < 2) {
+        if (answeredSoFar < 3) {
           console.warn("  [InterviewAgent] Early conclusion blocked — fewer than 3 questions answered");
           context.decision = { action: "advance", verdict: "weak", reasoning: "Early conclusion overridden — not enough evidence yet" };
           return { content: [{ type: "text", text: JSON.stringify({ overridden: true, reason: "need at least 3 answered questions before concluding early" }) }] };
@@ -195,7 +177,11 @@ async function runAgentQuery({ prompt, tools, allowedTools, maxTurns = 10 }) {
       for (const block of content) {
         if (block.type === "tool_use") {
           const reasoning = block.input?.reasoning || "";
-          toolEvents.push({ tool: block.name, reasoning });
+          toolEvents.push({
+            tool: block.name,
+            reasoning,
+            focusAreas: block.input?.focus_areas || [],
+          });
           console.log(`  [InterviewAgent] ▶ ${block.name} — "${reasoning.slice(0, 100)}"`);
         }
         if (block.type === "text" && block.text) {
@@ -269,13 +255,32 @@ export async function processAnswer({ sessionId, session, transcript }) {
   // Load previous answers from DB to provide full interview context
   const previousAnswers = await getAnswers(sessionId);
 
+  // Pre-compute evaluation before the agent loop to eliminate the double LLM call.
+  // The evaluate_answer tool returns this cached result — no nested LLM call in the tool handler.
+  let preEvaluation;
+  try {
+    preEvaluation = await analyseAnswer({
+      question:         currentQuestion.question,
+      answer:           transcript,
+      questionCategory: currentQuestion.category,
+      jdSummary:        session.jd_summary,
+      resumeSummary:    session.resume_summary,
+    });
+  } catch (err) {
+    preEvaluation = {
+      score_technical: 0, score_communication: 0, score_depth: 0, overall_score: 0,
+      flags: ["evaluation_error"], analysis: `Evaluation failed: ${err.message}`,
+      strength_points: [], gap_points: [],
+    };
+  }
+
   const context = {
     sessionId, transcript, currentQuestion, currentIndex,
     lastWasFollowup, followupCount,
     jdSummary:     session.jd_summary,
     resumeSummary: session.resume_summary,
     decision:     null,
-    evaluation:   null,
+    evaluation:   preEvaluation,
     observations: [],
   };
 
@@ -318,14 +323,7 @@ Your task (in order):
     maxTurns: 8,
   });
 
-  // Fallbacks if agent failed to complete expected actions
-  if (!context.evaluation) {
-    context.evaluation = {
-      score_technical: 5, score_communication: 5, score_depth: 5, overall_score: 5,
-      flags: [], analysis: "Evaluation not completed",
-      follow_up_needed: false, strength_points: [], gap_points: [],
-    };
-  }
+  // Fallback if agent failed to make a decision
   if (!context.decision) {
     context.decision = { action: "advance", verdict: "adequate", reasoning: "No decision made — advancing by default" };
   }
