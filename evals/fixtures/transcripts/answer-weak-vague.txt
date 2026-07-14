@@ -1,0 +1,1 @@
+Yeah I've worked with distributed systems before. We had some issues with reliability and we fixed them. I know about idempotency, it's basically making sure things don't happen twice. We used some caching and that helped. I'm pretty comfortable with that kind of stuff.

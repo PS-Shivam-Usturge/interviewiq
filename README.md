@@ -267,6 +267,62 @@ The report is generated once and cached — loading the page again does not re-r
                └───────────────┘
 ```
 
+## Agent trace
+
+Every decision the agent makes during an interview is recorded as a structured trace — a timestamped, chronological log of what the agent called, what it scored, what it decided, and why. The trace is stored in the `sessions.trace` column and never includes candidate transcript text.
+
+### Viewing the trace
+
+**Visual timeline** — open `/trace/:sessionId` in the browser. Events are grouped into three sections (Setup, Interview, Report) and rendered as collapsible cards:
+
+- **Setup cards** — show which tools ran and the agent's stated reasoning before acting
+- **Evaluation cards** — show scores (technical / communication / depth / overall) as progress bars, plus any flags raised (`vague`, `evasive`, `contradicts_resume`)
+- **Decision cards** — show the routing action (advance / follow-up / conclude early), the verdict, and the agent's written reasoning
+- **Observation cards** — show cross-question concerns the agent noted, with severity (info / warning / critical)
+- **Report card** — shows the final recommendation, score, confidence, and headline
+
+**API** — the raw event array is available at `GET /api/session/:id/trace`.
+
+**CLI** — two formats:
+
+```bash
+# Full JSON output (pipeable)
+interview-agent trace <session-id>
+
+# Human-readable one-liner per event
+interview-agent trace <session-id> --summary
+```
+
+Example `--summary` output:
+```
+Trace — Jane Smith · Senior Backend Engineer · mid · completed
+────────────────────────────────────────────────────────────
+[10:34:21] 🚀  Session started — 8 questions
+[10:34:22] 🔧  Tool: parse_documents  — "Extracting role requirements and candidate…"
+[10:34:45] 🔧  Tool: generate_question_bank  — "Focusing on distributed systems and API…"
+[10:35:40] 🔍  Q1 evaluated — overall 8/10
+[10:35:41] ➡   Decision: advance (strong)  — "Candidate gave concrete examples with real…"
+[10:36:30] 🔍  Q2 evaluated — overall 5/10  flags: vague
+[10:36:31] ↩   Decision: followup  — "Answer lacked specifics on failure recovery…"
+[10:41:20] ✅  Interview complete — 8 questions
+[10:41:55] 📝  Report: hire · score 74/100 · high confidence
+```
+
+### What the trace captures vs. what it omits
+
+| Captured | Omitted |
+|---|---|
+| Tool calls and the agent's stated reasoning | Candidate transcript text |
+| Per-question scores (technical / communication / depth) | Full LLM conversation history |
+| Flags raised on each answer | Uploaded JD/resume content |
+| Routing decision and verdict per question | |
+| Cross-question observations and severity | |
+| Report recommendation, score, and headline | |
+
+The trace is built for HR reviewers and hiring managers — it answers "how did the agent reach this recommendation?" without exposing raw interview content.
+
+---
+
 ### How agent state persists across HTTP requests
 
 Each HTTP request to `/api/session/:id/answer` is stateless from Express's point of view. The agent's continuity comes from SQLite:
@@ -315,6 +371,82 @@ The agent has 8 tools across three phases. Each tool call includes a `reasoning`
 | `conclude_interview_early` | Per answer | Ends the interview early when there is strong cross-question evidence — requires at least 3 answered questions, blocked otherwise |
 | `note_cumulative_concern` | Per answer | Records a recurring pattern that spans multiple answers (e.g. "candidate avoids specifics whenever implementation is probed") for the final report |
 | `generate_final_report` | Report | Reviews the entire interview conversation holistically and writes the eligibility report with scores, recommendation, strengths, gaps, and narrative |
+
+### Tool permissions (allowedTools per phase)
+
+The Claude Agent SDK enforces which tools the agent may call in each phase. If the agent tries to call a tool outside its allowed set, the SDK rejects the call rather than executing it. This is the least-privilege boundary — the setup agent cannot touch evaluation tools, and the interview agent cannot re-run document parsing.
+
+| Phase | Allowed tools | Blocked tools |
+|---|---|---|
+| Setup | `parse_documents`, `generate_question_bank` | All interview and report tools |
+| Per-answer (interview) | `evaluate_answer`, `request_followup`, `advance_to_next_question`, `conclude_interview_early`, `note_cumulative_concern` | Setup tools, report tools |
+| Report | *(none — `generate_final_report` is a direct sub-agent call, not a tool-loop)* | All tools |
+
+The `allowedTools` arrays are defined in `backend/agents/interviewAgent.js` and passed to `query()` at the start of each phase. The agent cannot escalate its own permissions at runtime.
+
+---
+
+## Sub-agents
+
+The orchestration agent delegates four specific tasks to sub-agents — direct LLM calls (no tool loop) that return structured JSON. Sub-agents are called by the orchestration agent during its own tool-calling loop; they are not accessible via the HTTP API directly.
+
+### `parseAgent` — document understanding
+
+**File:** `backend/agents/parseAgent.js`  
+**Called by:** `setupInterview()` via the `parse_documents` tool handler  
+**When:** Once per session during the setup phase
+
+Receives raw JD and resume text (after sanitization). Makes two separate LLM calls — one for the JD, one for the resume — and returns structured summaries. These summaries drive every subsequent decision: question selection, difficulty calibration, and report framing.
+
+| Function | Input | Output |
+|---|---|---|
+| `summariseJD(text)` | Raw JD text (up to 4000 chars) | `{ role_title, seniority_level, required_skills[], tech_stack[], responsibilities[], nice_to_haves[] }` |
+| `summariseResume(text)` | Raw resume text (up to 4000 chars) | `{ candidate_name, years_total_experience, current_title, skills[], experience_highlights[], education }` |
+
+---
+
+### `questionAgent` — interview planning
+
+**File:** `backend/agents/questionAgent.js`  
+**Called by:** `setupInterview()` via the `generate_question_bank` tool handler  
+**When:** Once per session, immediately after parsing
+
+Receives both summaries and the chosen difficulty level. Returns exactly 8 questions with category distribution, intended depth, and the agent's stated interview strategy. The question bank is saved to SQLite and used for the entire interview.
+
+**Input:** `{ jdSummary, resumeSummary, difficulty, candidateName }`  
+**Output:** `{ questions: [{ id, category, question, intent, difficulty, follow_ups[] }], strategy, focusAreas[] }`
+
+Category distribution: `opening` (1), `technical` (3), `behavioural` (2), `situational` (1), `closing` (1).
+
+---
+
+### `answerAgent` — per-answer evaluation
+
+**File:** `backend/agents/answerAgent.js`  
+**Called by:** `processAnswer()` via the `evaluate_answer` tool handler  
+**When:** Once per submitted answer (including follow-ups)
+
+Receives the question, the candidate's transcript, and a summary of prior answers for cross-question context. Returns three dimension scores, an overall score, flags, and a written analysis. The orchestration agent reads this output and then decides whether to follow up, advance, or conclude early.
+
+**Input:** `{ question, answer, category, priorContext, jdSummary }`  
+**Output:** `{ score_technical, score_communication, score_depth, overall_score, flags[], strength_points[], gap_points[], analysis }`
+
+**Flags raised:** `vague` (non-specific answer), `evasive` (deflects the question), `contradicts_resume` (claims skills not in resume), `no_answer` (empty or one-word response), `very_short` (under 20 words).
+
+---
+
+### `reportAgent` — final assessment
+
+**File:** `backend/agents/reportAgent.js`  
+**Called by:** `generateAgentReport()` via the `generate_final_report` tool handler  
+**When:** Once, after the interview is completed, when the HR user opens the report page
+
+Receives all scored answers, JD and resume summaries, and any cross-question observations the agent recorded during the interview. Synthesizes everything into a holistic eligibility report. The result is cached in the `reports` table — loading the report page again returns the cached version without re-running the LLM.
+
+**Input:** `{ sessionId, session, answers[], jdSummary, resumeSummary, agentObservations[] }`  
+**Output:** `{ overall_score, recommendation, confidence, headline, strengths[], gaps[], red_flags[], skill_ratings[], narrative, suggested_next_steps[] }`
+
+**Recommendation values:** `strong_hire` · `hire` · `maybe` · `no_hire`
 
 ---
 
@@ -482,6 +614,180 @@ Called by the interview frontend after Whisper transcription to push the candida
 
 ---
 
+### `GET /api/session/:sessionId/trace`
+
+Returns the agent's full decision trace for a session — every tool call, evaluation score, routing decision, observation, and report event in chronological order. Does not include candidate transcripts.
+
+**Response:**
+```json
+{
+  "sessionId": "uuid",
+  "candidateName": "Jane Smith",
+  "role": "Senior Backend Engineer",
+  "difficulty": "mid",
+  "status": "completed",
+  "createdAt": 1720000000,
+  "events": [
+    {
+      "time": 1720000001, "phase": "setup", "event": "session_started",
+      "candidate": "Jane Smith", "role": "Senior Backend Engineer",
+      "difficulty": "mid", "totalQuestions": 8
+    },
+    {
+      "time": 1720000003, "phase": "setup", "event": "tool_call",
+      "tool": "parse_documents",
+      "reasoning": "Extracting role requirements and candidate background before planning questions",
+      "focusAreas": []
+    },
+    {
+      "time": 1720000040, "phase": "interview", "event": "evaluation",
+      "questionIndex": 0, "category": "technical",
+      "scores": { "technical": 8, "communication": 7, "depth": 6, "overall": 7 },
+      "flags": [], "analysis": "Solid answer with concrete examples..."
+    },
+    {
+      "time": 1720000041, "phase": "interview", "event": "decision",
+      "questionIndex": 0, "action": "advance", "verdict": "strong",
+      "reasoning": "Candidate demonstrated clear understanding with real-world examples"
+    },
+    {
+      "time": 1720000300, "phase": "report", "event": "report_generated",
+      "recommendation": "hire", "overallScore": 74,
+      "confidence": "high", "headline": "Strong backend engineer with solid fundamentals"
+    }
+  ]
+}
+```
+
+**Event types:**
+
+| Event | Phase | Key fields |
+|---|---|---|
+| `session_started` | setup | `candidate`, `role`, `difficulty`, `totalQuestions` |
+| `tool_call` | setup | `tool`, `reasoning`, `focusAreas` |
+| `evaluation` | interview | `questionIndex`, `scores` (technical/communication/depth/overall), `flags`, `analysis` |
+| `decision` | interview | `questionIndex`, `action` (advance/followup/conclude_early), `verdict`, `reasoning`, `followUpQuestion` |
+| `observation` | interview | `severity` (info/warning/critical), `observation` (the concern text) |
+| `session_complete` | interview | `answeredCount`, `concludedEarly` |
+| `report_generated` | report | `recommendation`, `overallScore`, `confidence`, `headline` |
+
+---
+
+## CLI reference
+
+The `interview-agent` CLI lets you drive sessions from a terminal without opening a browser. The backend server must already be running (`npm run dev` in `backend/`).
+
+**Install:**
+```bash
+cd backend
+npm install     # installs commander along with other deps
+npm link        # makes `interview-agent` available globally
+# or run without linking:
+node backend/cli.js <command>
+```
+
+**Global options** (apply to every command):
+
+| Option | Env var | Default | Description |
+|---|---|---|---|
+| `--server <url>` | `INTERVIEW_AGENT_SERVER` | `http://localhost:3001` | Base URL of the backend API |
+| `--api-key <key>` | `INTERVIEW_AGENT_API_KEY` | *(none)* | Sent as `X-API-Key` header; required if `API_KEYS` is set in `.env` |
+
+Errors are written to stderr and exit with code 1. All successful output is JSON on stdout.
+
+---
+
+### `interview-agent health`
+
+Checks that the backend is reachable and returns its current provider.
+
+```bash
+interview-agent health
+# { "status": "ok", "provider": "claude-sdk", "phase": 3 }
+```
+
+---
+
+### `interview-agent parse --jd <file> --resume <file>`
+
+Uploads a JD and resume, runs the parse agent, and returns structured summaries. Accepts PDF, DOCX, or TXT files.
+
+```bash
+interview-agent parse --jd ./job-description.pdf --resume ./cv.pdf
+```
+
+Output: the same JSON returned by `POST /api/parse` — JD summary and resume summary side by side.
+
+---
+
+### `interview-agent session start --jd-text <file> --resume-text <file>`
+
+Starts a new interview session. Reads plain-text files (use a `.txt` export of your JD/resume). The agent parses both documents, generates the question bank, and returns the session ID and first question. This call typically takes 20–40 seconds.
+
+```bash
+interview-agent session start \
+  --jd-text ./jd.txt \
+  --resume-text ./resume.txt \
+  --difficulty senior
+```
+
+Options: `--candidate <name>` (default: extracted from resume), `--difficulty junior|mid|senior|principal` (default: `mid`).
+
+Output includes `sessionId`, `candidateName`, `totalQuestions`, and `currentQuestion`.
+
+---
+
+### `interview-agent session status <id>`
+
+Returns the current state of a session — current question index, progress, and the last three scored answers.
+
+```bash
+interview-agent session status 550e8400-e29b-41d4-a716-446655440000
+```
+
+---
+
+### `interview-agent report <id>`
+
+Generates (or returns the cached) eligibility report for a completed session. The interview must be finished before this will succeed.
+
+```bash
+interview-agent report 550e8400-e29b-41d4-a716-446655440000
+```
+
+Output is the full report JSON: scores, recommendation, narrative, skill ratings, strengths, and gaps.
+
+---
+
+### `interview-agent trace <id> [--summary]`
+
+Returns the agent's decision trace for a session.
+
+```bash
+# Full JSON (machine-readable, pipeable)
+interview-agent trace 550e8400-e29b-41d4-a716-446655440000
+
+# Human-readable one-liner per event
+interview-agent trace 550e8400-e29b-41d4-a716-446655440000 --summary
+```
+
+`--summary` output:
+```
+Trace — Jane Smith · Senior Backend Engineer · mid · completed
+────────────────────────────────────────────────────────────
+[10:34:21] 🚀  Session started — 8 questions
+[10:34:22] 🔧  Tool: parse_documents  — "Extracting role requirements and candidate…"
+[10:34:45] 🔧  Tool: generate_question_bank  — "Focusing on distributed systems and API…"
+[10:35:40] 🔍  Q1 evaluated — overall 8/10
+[10:35:41] ➡   Decision: advance (strong)  — "Candidate gave concrete examples…"
+[10:36:30] 🔍  Q2 evaluated — overall 5/10  flags: vague
+[10:36:31] ↩   Decision: followup  — "Answer lacked specifics on failure recovery…"
+[10:41:20] ✅  Interview complete — 8 questions
+[10:41:55] 📝  Report: hire · score 74/100 · high confidence
+```
+
+---
+
 ## Project structure
 
 ```
@@ -506,17 +812,19 @@ interviewiq/
 │       ├── session.js          # POST /api/session/start, POST /api/session/:id/answer
 │       ├── report.js           # GET /api/report/:sessionId
 │       ├── transcribe.js       # POST /api/transcribe (Groq Whisper)
-│       └── monitor.js          # GET /api/monitor/:sessionId (SSE) + POST live transcript
+│       ├── monitor.js          # GET /api/monitor/:sessionId (SSE) + POST live transcript
+│       └── trace.js            # GET /api/session/:id/trace
 │
 └── frontend/
     └── src/
-        ├── main.jsx                 # React Router — 5 routes
+        ├── main.jsx                 # React Router — 6 routes
         ├── index.css                # Dark design system with CSS variables
         ├── pages/
         │   ├── SetupPage.jsx        # HR: upload → parse preview → generate session → share links
         │   ├── InterviewPage.jsx    # Candidate: TTS question → voice recording → submit loop
         │   ├── MonitorPage.jsx      # HR: SSE live feed — transcript, running scores, flag tally
         │   ├── ReportPage.jsx       # HR: score rings, strengths/gaps, skill ratings, print export
+        │   ├── TracePage.jsx        # HR: agent decision timeline — tool calls, scores, decisions
         │   └── ThankYouPage.jsx     # Candidate: end screen (no scores shown)
         ├── components/
         │   ├── FileDropZone.jsx     # Drag-and-drop file upload
@@ -548,6 +856,7 @@ SQLite database is created automatically at `backend/interview.db` on first run.
 | `agent_history` | JSON — full LLM conversation history (replayed each request) |
 | `agent_observations` | JSON — cross-question concerns noted by the agent |
 | `concluded_early` | 1 if the agent ended the interview before all questions |
+| `trace` | JSON array — chronological agent decision events (tool calls, evaluations, decisions, report) |
 
 ### `answers` table — one row per question answered
 
@@ -650,10 +959,188 @@ rm backend/interview.db
 
 ---
 
+## Security considerations
+
+### API key authentication
+
+Set `API_KEYS` in `backend/.env` to enable authentication:
+
+```
+API_KEYS=your-secret-key-1,your-secret-key-2
+```
+
+All endpoints (except `GET /api/health`) require the `X-API-Key: <key>` header. If `API_KEYS` is not set, auth is disabled (dev mode).
+
+### Rate limiting
+
+Three rate limiters are active by default (in-memory, per-IP):
+
+| Endpoint | Limit |
+|---|---|
+| All routes | 100 req / 15 min |
+| `POST /api/transcribe` | 20 req / 15 min |
+| `POST /api/session/:id/answer` | 30 req / 15 min |
+
+### Prompt injection protection
+
+All user-controlled text (transcripts, JD content, resume content) is sanitized before being interpolated into LLM prompts. Stripped patterns include: `<|im_start|>`, `<|im_end|>`, `[INST]`, `IGNORE PREVIOUS INSTRUCTIONS`, `SYSTEM PROMPT:`, and triple-backtick injection blocks.
+
+### Data handling
+
+- All interview data (transcripts, scores, reports) is stored locally in `backend/interview.db` — a SQLite file on your machine
+- No interview data is sent to any third party other than the LLM provider (Groq/Gemini/Anthropic) for processing
+- The LLM provider receives the question and transcript text — never raw uploaded files
+- Uploaded JD/resume files are deleted from disk immediately after text extraction
+- `interview.db` is excluded from git via `.gitignore`
+
+### Environment variable security
+
+- Never commit `.env` — it is excluded by `.gitignore`
+- Rotate `CLAUDE_CODE_OAUTH_TOKEN` via `claude setup-token` if it is ever exposed
+- Rotate `GROQ_API_KEY` at https://console.groq.com if exposed
+
+---
+
+## Running evaluations
+
+The eval suite tests all four agent functions (parseAgent, questionAgent, answerAgent, reportAgent) without running a full interview session. It uses your existing `.env` for LLM access.
+
+**Requirements:** Backend `.env` must be configured (`CLAUDE_CODE_OAUTH_TOKEN` required for the LLM-as-judge; `GROQ_API_KEY` or another provider for the agent calls).
+
+```bash
+# From the project root
+node evals/runner.js
+```
+
+Output:
+```
+InterviewIQ Eval Runner — 40 test cases
+──────────────────────────────────────────────────
+  parse-001        Valid SWE JD extracts role_title                          PASS
+  parse-002        Valid SWE JD extracts required_skills array with ≥3 items PASS
+  ...
+──────────────────────────────────────────────────
+Results: 37/40 passed (93%)
+
+  parseAgent           10/10
+  questionAgent        9/10
+  answerAgent          9/10
+  reportAgent          9/10
+
+Results written to evals/results/results.json
+```
+
+The runner exits with code 0 if pass rate ≥ 80%, code 1 otherwise.
+
+### Interpreting results
+
+**Overall pass rate**
+
+| Rate | Meaning |
+|---|---|
+| ≥ 90% | Healthy — agents are producing structurally correct, well-calibrated output |
+| 80–89% | Acceptable — one or two edge cases are flaky; investigate before deploying |
+| < 80% | Failing threshold — something is broken; check the failure list before using the system |
+
+The runner writes `evals/results/results.json` every run. Open this file to see the exact failure reasons rather than reading the terminal output.
+
+**Per-agent failures**
+
+Each agent has 10 test cases. A single agent failing 3+ cases usually means a prompt regression or a changed output schema. Focus on which agent is failing — if `answerAgent` has 4 failures, check `backend/agents/answerAgent.js` rather than the others.
+
+**`llm_judge` failures**
+
+Two cases use an LLM-as-judge assertion: one for question diversity (questionAgent) and one for report narrative quality (reportAgent). These are the only cases that call Claude. A judge failure means:
+- The output is structurally correct (fields exist, types match) but the quality is poor — e.g. all 8 questions are about the same topic, or the report narrative is a single sentence
+- Judge verdicts can occasionally vary between runs because they are probabilistic; if a case alternates pass/fail across runs, the output is borderline and the prompt should be strengthened
+
+**Flaky cases vs. broken cases**
+
+Run the suite twice. A case that fails consistently is broken. A case that fails once in five runs is flaky. Flaky cases in `answerAgent` usually mean the LLM produced a score slightly outside the expected range — tighten the range assertion or update the fixture to be less ambiguous.
+
+**Common failure patterns and fixes**
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `field_exists` failures on all cases for one agent | Agent returned a string instead of JSON | Check `safeJsonParse` in `llm.js`; the prompt may be missing "respond with JSON only" |
+| `number_gte` failure on a score assertion | LLM scored a "strong" answer lower than expected | Adjust the fixture answer to be more clearly strong, or widen the assertion range |
+| `array_min_length` failure on `required_skills` | Short/vague JD fixture returned fewer skills | Update the fixture JD to be more detailed |
+| LLM judge failure on narrative quality | Report narrative is too short or generic | Check `reportAgent.js` prompt; increase the minimum length instruction |
+
+### Adding new test cases
+
+Add entries to `evals/cases/<agent>.cases.js` following the same structure:
+
+```js
+{
+  id: "answer-011",
+  description: "Answer with specific metrics scores depth >= 7",
+  agent: "answerAgent",
+  fn: "analyseAnswer",
+  input: {
+    question: "Describe a system you scaled to handle 10x traffic.",
+    answer: readFixture("transcripts/answer-strong-technical.txt"),
+    category: "technical",
+  },
+  assertions: [
+    { type: "number_gte", field: "score_depth", min: 7 },
+    { type: "field_exists", field: "strength_points" },
+  ],
+}
+```
+
+Available assertion types: `field_exists`, `field_equals`, `field_in_set`, `array_min_length`, `array_length`, `array_includes`, `array_items_unique`, `every_item_has_nonempty_field`, `number_gte`, `number_lte`, `number_between`, `string_min_length`, `llm_judge`, `no_crash`.
+
+For `llm_judge`, the assertion takes a `prompt` function that receives the agent output and returns the judge prompt string:
+
+```js
+{
+  type: "llm_judge",
+  prompt: (result) => `The following is an interview report narrative. Does it mention at least two specific technical skills with evidence from the candidate's answers? Respond with JSON: { "pass": true/false, "score": 0-10, "reason": "..." }\n\nNarrative:\n${result.narrative}`,
+}
+```
+
+---
+
 ## Known limitations
 
-- **No authentication** — anyone with the session URL can view or interact with the session. Suitable for local and demo use only.
-- **No concurrent answer protection** — if two requests submit answers to the same session simultaneously, the agent history may be corrupted.
+- **Auth is off by default** — set `API_KEYS` in `.env` to enable it for non-local deployments.
+- **No concurrent answer protection** — if two requests submit answers to the same session simultaneously, the agent history may be corrupted. Only one browser tab per candidate session is safe.
+- **Rate limiting is in-memory** — the express-rate-limit counters reset on every backend restart and are not shared across multiple server processes. Not suitable for multi-instance deployments without a Redis store.
 - **8-question limit** — the question bank is always 8 questions. The agent may conclude early but cannot go beyond 8.
-- **Browser TTS quality varies** — Windows and macOS have natural-sounding voices; Linux may sound robotic.
+- **Browser TTS quality varies** — Windows and macOS have natural-sounding voices; Linux may sound robotic without additional voices installed.
 - **Files not stored on disk** — uploaded JD/resume files are processed in memory and not saved. The extracted text is stored in SQLite.
+- **No candidate link expiry** — the candidate interview URL remains valid indefinitely once created. There is no expiry, one-time-use enforcement, or revocation mechanism.
+- **Single-user SQLite** — `interview.db` is a local file with no connection pooling. Concurrent interviews from multiple HR users against the same backend instance can cause write contention under load.
+
+---
+
+## Future hardening steps
+
+These are the highest-priority items to address before running this system in a production or multi-user environment.
+
+### Security
+
+- **Candidate link expiry** — add a `valid_until` timestamp to the session and reject interview submissions once it has passed. One-time-use enforcement (mark the link used after the first answer) prevents replay.
+- **Persistent API key store** — replace the comma-separated `API_KEYS` env var with a hashed key table in SQLite (or a secrets manager). Support key rotation and per-key audit logs.
+- **Database encryption** — encrypt `interview.db` at rest using SQLCipher or encrypt the sensitive columns (`jd_text`, `resume_text`, `agent_history`, `transcript`) before writing. Protects against an attacker gaining filesystem access.
+- **Content Security Policy headers** — add `helmet.js` to the Express server to set CSP, HSTS, X-Frame-Options, and other security headers.
+
+### Reliability
+
+- **Concurrent answer protection** — wrap each `POST /session/:id/answer` handler in an optimistic lock: read the current `updated_at` timestamp, run the agent, then update only if `updated_at` hasn't changed. Reject with 409 if it has.
+- **Persistent rate limiting** — replace in-memory `express-rate-limit` with a Redis store (`rate-limit-redis`) so limits survive restarts and work across multiple server instances.
+- **Agent timeout recovery** — if the Claude SDK `query()` call times out mid-loop (the AbortController fires), the session is left in an inconsistent state. Add a `processing` status flag so the next request can detect and recover a stuck session.
+- **Structured output validation in sub-agents** — currently sub-agents call `safeJsonParse` and return a partial result on parse failure. Replace with Zod validation so callers receive a typed object or a typed error, not an unpredictable partial.
+
+### Scalability
+
+- **Replace SQLite with PostgreSQL** — for multi-user or multi-instance deployments. The schema maps cleanly; `@libsql/client` can be swapped for `pg`.
+- **Move audio transcription to a queue** — Groq Whisper calls block the answer submission request for 2–5 seconds. Offload to a background worker (BullMQ + Redis) and return a job ID; the frontend polls for the transcript.
+- **SSE monitor scaling** — the `GET /monitor/:id` SSE connection holds a long-lived HTTP connection per HR user. Under many concurrent monitors, use a pub/sub layer (Redis Pub/Sub or a WebSocket server) instead of polling SQLite in a setInterval loop.
+
+### Observability
+
+- **Log aggregation** — pipe pino JSON output to a log aggregator (Loki, Datadog, CloudWatch). Add a `sessionId` field to every log line for per-interview filtering.
+- **Distributed tracing** — instrument `agentQuery()` and each sub-agent call with OpenTelemetry spans so you can see end-to-end latency per interview step in a trace viewer.
+- **Eval in CI** — run `node evals/runner.js` as a CI step (GitHub Actions, etc.) on every push to catch prompt regressions before deployment. Cache the OAuth token as a CI secret.

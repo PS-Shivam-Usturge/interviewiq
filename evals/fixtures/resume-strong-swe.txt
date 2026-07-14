@@ -1,0 +1,33 @@
+Priya Sharma
+priya.sharma@email.com | linkedin.com/in/priyasharma | github.com/priyasharma
+
+SUMMARY
+Senior Software Engineer with 7 years of experience building high-throughput backend systems. Specialized in distributed systems and payments infrastructure. Currently leading a team of 4 engineers at Stripe.
+
+EXPERIENCE
+
+Senior Software Engineer — Stripe, San Francisco (2021–Present)
+- Led design and implementation of idempotent payment retry system handling 50M+ transactions/day
+- Reduced p99 latency from 450ms to 180ms by redesigning the authorization pipeline with async processing
+- Owned PCI-DSS compliance review for new card tokenization service
+- Mentored 3 junior engineers; conducted weekly 1:1s and code reviews
+- Tech stack: Go, Kafka, PostgreSQL, Kubernetes (GKE), gRPC
+
+Software Engineer — Braintree, Chicago (2018–2021)
+- Built settlement reconciliation service processing $2B+ in monthly volume
+- Designed event-driven refund processing pipeline using Kafka and idempotency keys
+- Migrated legacy SOAP payment gateway integration to REST + gRPC
+- Tech stack: Node.js, PostgreSQL, AWS (EKS, RDS, SQS), Docker
+
+Junior Software Engineer — Accenture, Chicago (2017–2018)
+- Built internal tooling for client billing automation
+- Tech stack: Java, MySQL, React
+
+EDUCATION
+B.S. Computer Science — University of Illinois, Urbana-Champaign (2017)
+
+SKILLS
+Go, Node.js, PostgreSQL, Kafka, gRPC, REST, Kubernetes, Docker, AWS (EKS/RDS/SQS), React, PCI-DSS, distributed systems, system design
+
+CERTIFICATIONS
+AWS Certified Solutions Architect — Associate (2022)

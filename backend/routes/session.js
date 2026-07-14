@@ -1,5 +1,9 @@
 import express from "express";
 import { startSession, submitAnswer, getSessionState } from "../agents/sessionManager.js";
+import { answerLimiter } from "../middleware/rateLimit.js";
+import logger from "../logger.js";
+
+const log = logger.child({ component: "SessionRoute" });
 
 const router = express.Router();
 
@@ -18,7 +22,7 @@ router.post("/session/start", async (req, res) => {
     const result = await startSession({ jdText, resumeText, jdSummary, resumeSummary, difficulty });
     res.json(result);
   } catch (err) {
-    console.error("Session start error:", err);
+    log.error({ err }, "Session start error");
     res.status(500).json({ error: "Failed to start session: " + err.message });
   }
 });
@@ -27,7 +31,7 @@ router.post("/session/start", async (req, res) => {
 // Body: { transcript }
 // Returns: { answerAnalysis, nextQuestion, isComplete, progress, ... }
 
-router.post("/session/:id/answer", async (req, res) => {
+router.post("/session/:id/answer", answerLimiter, async (req, res) => {
   const { id } = req.params;
   const { transcript } = req.body;
 
@@ -39,7 +43,7 @@ router.post("/session/:id/answer", async (req, res) => {
     const result = await submitAnswer({ sessionId: id, transcript });
     res.json(result);
   } catch (err) {
-    console.error("Answer submit error:", err);
+    log.error({ err }, "Answer submit error");
     const status = err.message.includes("not found") ? 404 : 500;
     res.status(status).json({ error: err.message });
   }
@@ -55,7 +59,7 @@ router.get("/session/:id", async (req, res) => {
     if (!state) return res.status(404).json({ error: "Session not found" });
     res.json(state);
   } catch (err) {
-    console.error("Get session error:", err);
+    log.error({ err }, "Get session error");
     res.status(500).json({ error: err.message });
   }
 });

@@ -2,6 +2,10 @@ import { agentQuery } from "../agentClient.js";
 import { safeJsonParse } from "../llm.js";
 import { getSession, getAnswers } from "../db/sessionStore.js";
 import db from "../db/database.js";
+import { sanitizeInput } from "../utils/sanitize.js";
+import logger from "../logger.js";
+
+const log = logger.child({ component: "ReportAgent" });
 
 // ── Generate report ────────────────────────────────────────────────────────────
 
@@ -12,7 +16,7 @@ export async function generateReport(sessionId) {
   // Return cached report if already generated
   const existing = await getStoredReport(sessionId);
   if (existing) {
-    console.log(`  [ReportAgent] Returning cached report for ${sessionId}`);
+    log.info({ sessionId }, "Returning cached report");
     return existing;
   }
 
@@ -22,12 +26,12 @@ export async function generateReport(sessionId) {
   const jdS     = session.jd_summary;
   const resumeS = session.resume_summary;
 
-  console.log(`  [ReportAgent] Generating report for ${resumeS?.candidate_name} (${answers.length} answers)...`);
+  log.info({ sessionId, candidate: resumeS?.candidate_name, answers: answers.length }, "Generating report");
 
   const answerSummary = answers.map((a) => ({
     q:        a.question,
     category: a.question_category,
-    answer:   (a.transcript || "").slice(0, 400),
+    answer:   sanitizeInput(a.transcript || "", 400),
     scores:   { technical: a.score_technical, communication: a.score_communication, depth: a.score_depth },
     flags:    safeJson(a.flags),
     analysis: a.analysis,
@@ -74,7 +78,7 @@ Return this exact JSON (no extra fields):
 
   await storeReport(sessionId, report);
 
-  console.log(`  [ReportAgent] Report generated — ${report.recommendation} (${report.overall_score}/100)`);
+  log.info({ sessionId, recommendation: report.recommendation, score: report.overall_score }, "Report generated");
   return { ...report, sessionId, candidateName: resumeS?.candidate_name, roleTitle: jdS?.role_title };
 }
 

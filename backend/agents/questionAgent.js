@@ -1,5 +1,9 @@
 import { agentQuery } from "../agentClient.js";
 import { safeJsonParse } from "../llm.js";
+import { sanitizeInput } from "../utils/sanitize.js";
+import logger from "../logger.js";
+
+const log = logger.child({ component: "QuestionAgent" });
 
 // ── Question bank generation ───────────────────────────────────────────────────
 
@@ -11,6 +15,10 @@ export async function generateQuestionBank({ jdSummary, resumeSummary, difficult
     principal: "Architecture decisions at scale, org-wide technical strategy, cross-team influence, and industry-level thinking.",
   };
 
+  const safeRole        = sanitizeInput(jdSummary.role_title || "", 200);
+  const safeCandidate   = sanitizeInput(resumeSummary.candidate_name || "", 100);
+  const safeTitle       = sanitizeInput(resumeSummary.current_title || "", 100);
+
   const prompt = `You are an expert technical interviewer at a top-tier tech company.
 You create precise, relevant interview questions tailored to the specific role and candidate.
 Always respond with valid JSON only — no markdown, no preamble, no explanation.
@@ -18,13 +26,13 @@ Keep each string field concise — under 200 characters where possible.
 
 Create an interview question bank for this candidate.
 
-ROLE: ${jdSummary.role_title} (${jdSummary.seniority_level})
+ROLE: ${safeRole} (${jdSummary.seniority_level})
 REQUIRED SKILLS: ${jdSummary.required_skills?.slice(0, 8).join(", ")}
 TECH STACK: ${jdSummary.tech_stack?.slice(0, 6).join(", ")}
 KEY RESPONSIBILITIES: ${jdSummary.key_responsibilities?.slice(0, 3).join("; ")}
 
-CANDIDATE: ${resumeSummary.candidate_name}
-CURRENT TITLE: ${resumeSummary.current_title}
+CANDIDATE: ${safeCandidate}
+CURRENT TITLE: ${safeTitle}
 EXPERIENCE: ${resumeSummary.years_total_experience} years
 CANDIDATE SKILLS: ${resumeSummary.skills?.slice(0, 10).join(", ")}
 
@@ -71,7 +79,7 @@ Rules:
 
   if (ordered.length === 0) throw new Error("Question bank generation returned no questions");
 
-  console.log(`  [QuestionAgent] Generated ${ordered.length} questions`);
+  log.info({ count: ordered.length }, "Generated question bank");
   return ordered;
 }
 

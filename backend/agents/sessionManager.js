@@ -3,8 +3,12 @@ import {
   createSession, getSession, getAnswers,
   saveQuestionBank, updateParsedSummaries,
   advanceQuestion, markFollowUp, saveAnswer, completeSession,
-  appendAgentObservations, markConcludedEarly,
+  appendAgentObservations, markConcludedEarly, appendTrace,
 } from "../db/sessionStore.js";
+import logger from "../logger.js";
+
+const log = logger.child({ component: "SessionManager" });
+const now = () => Math.floor(Date.now() / 1000);
 
 // ── startSession ──────────────────────────────────────────────────────────────
 // Called by POST /api/session/start
@@ -20,7 +24,7 @@ export async function startSession({ jdText, resumeText, jdSummary, resumeSummar
     difficulty,
   });
 
-  console.log(`  [SessionManager] Agent starting session ${sessionId}...`);
+  log.info({ sessionId }, "Agent starting session");
 
   // Hand off to the interview agent — it reasons about the candidate and generates questions
   const result = await setupInterview({
@@ -45,16 +49,29 @@ export async function startSession({ jdText, resumeText, jdSummary, resumeSummar
   );
   await saveQuestionBank(sessionId, result.questionBank);
 
+  // Persist agent setup trace
+  const setupTrace = [
+    { time: now(), phase: "setup", event: "session_started",
+      candidate: result.resumeSummary?.candidate_name || "Candidate",
+      role: result.jdSummary?.role_title || "Unknown role",
+      difficulty, totalQuestions: result.questionBank.length },
+    ...(result.toolEvents || []).map(ev => ({
+      time: now(), phase: "setup", event: "tool_call",
+      tool: ev.tool, reasoning: ev.reasoning || "",
+      focusAreas: ev.focusAreas || [],
+    })),
+  ];
+  await appendTrace(sessionId, setupTrace);
+
   const candidateName = result.resumeSummary?.candidate_name || "Candidate";
 
-  console.log(`  [SessionManager] Agent ready — ${result.questionBank.length} Qs for ${candidateName}`);
+  log.info({ sessionId, candidateName, questions: result.questionBank.length }, "Agent ready");
   if (result.agentSummary) {
-    console.log(`  [SessionManager] Agent notes: "${result.agentSummary.slice(0, 120)}"`);
+    log.info({ sessionId, notes: result.agentSummary.slice(0, 120) }, "Agent setup notes");
   }
 
-  // Log the agent's tool reasoning from setup
   for (const ev of result.toolEvents || []) {
-    console.log(`  [InterviewAgent] Setup tool "${ev.tool}": ${(ev.reasoning || "").slice(0, 80)}`);
+    log.info({ tool: ev.tool, reasoning: (ev.reasoning || "").slice(0, 80) }, "Setup tool called");
   }
 
   return {
@@ -87,7 +104,7 @@ export async function submitAnswer({ sessionId, transcript }) {
 
   if (!currentQuestion) throw new Error("No current question found");
 
-  console.log(`  [SessionManager] Agent evaluating answer for Q${currentIndex + 1} (${currentQuestion.category})...`);
+  log.info({ sessionId, questionIndex: currentIndex, category: currentQuestion.category }, "Agent evaluating answer");
 
   const result = await processAnswer({ sessionId, session, transcript });
 
@@ -96,12 +113,12 @@ export async function submitAnswer({ sessionId, transcript }) {
   if (!evaluation) throw new Error("Agent did not evaluate the answer");
   if (!decision)   throw new Error("Agent did not make a decision (advance/followup/conclude_early)");
 
-  console.log(`  [SessionManager] Agent decision: ${decision.action}${decision.verdict ? ` (${decision.verdict})` : ""} — "${(decision.reasoning || "").slice(0, 100)}"`);
+  log.info({ sessionId, action: decision.action, verdict: decision.verdict, reasoning: (decision.reasoning || "").slice(0, 100) }, "Agent decision");
 
   // Persist any cross-question observations the agent noted
   if (observations?.length) {
     await appendAgentObservations(sessionId, observations);
-    console.log(`  [Orchestrator] Saved ${observations.length} cumulative observation(s)`);
+    log.info({ sessionId, count: observations.length }, "Saved cumulative observations");
   }
 
   // Persist the answer with agent reasoning embedded in the analysis field
@@ -143,7 +160,7 @@ export async function submitAnswer({ sessionId, transcript }) {
     nextIndex = questions.length; // signal completion
     await advanceQuestion(sessionId, nextIndex);
     await markConcludedEarly(sessionId);
-    console.log(`  [SessionManager] Agent concluded early (${decision.preliminary_verdict}): "${(decision.reasoning || "").slice(0, 80)}"`);
+    log.info({ sessionId, verdict: decision.preliminary_verdict, reasoning: (decision.reasoning || "").slice(0, 80) }, "Agent concluded early");
 
   } else {
     // advance normally
@@ -155,8 +172,42 @@ export async function submitAnswer({ sessionId, transcript }) {
   const isComplete = !isFollowUp && nextIndex >= questions.length;
   if (isComplete) {
     await completeSession(sessionId);
-    console.log(`  [SessionManager] Session ${sessionId} completed`);
+    log.info({ sessionId }, "Session completed");
   }
+
+  // Persist agent decision trace for this answer
+  const answerTrace = [
+    { time: now(), phase: "interview", event: "evaluation",
+      questionIndex: currentIndex,
+      question: currentQuestion.question,
+      category: currentQuestion.category,
+      scores: {
+        technical:     evaluation.score_technical,
+        communication: evaluation.score_communication,
+        depth:         evaluation.score_depth,
+        overall:       evaluation.overall_score,
+      },
+      flags:    evaluation.flags    || [],
+      analysis: evaluation.analysis || "",
+    },
+    { time: now(), phase: "interview", event: "decision",
+      questionIndex: currentIndex,
+      action:          decision.action,
+      verdict:         decision.verdict          || null,
+      reasoning:       decision.reasoning        || "",
+      followUpQuestion: decision.action === "followup" ? decision.followUpQuestion : null,
+      preliminaryVerdict: decision.preliminary_verdict || null,
+    },
+    ...(result.observations || []).map(obs => ({
+      time: now(), phase: "interview", event: "observation",
+      questionIndex: currentIndex,
+      severity:    obs.severity,
+      observation: obs.observation,
+    })),
+    ...(isComplete ? [{ time: now(), phase: "interview", event: "session_complete",
+      answeredCount: nextIndex, concludedEarly: decision.action === "conclude_early" }] : []),
+  ];
+  await appendTrace(sessionId, answerTrace);
 
   return {
     answeredQuestion: currentQuestion.question,

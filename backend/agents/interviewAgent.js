@@ -5,6 +5,10 @@ import { generateQuestionBank } from "./questionAgent.js";
 import { analyseAnswer } from "./answerAgent.js";
 import { generateReport } from "./reportAgent.js";
 import { getAnswers } from "../db/sessionStore.js";
+import { sanitizeInput } from "../utils/sanitize.js";
+import logger from "../logger.js";
+
+const log = logger.child({ component: "InterviewAgent" });
 
 // ── Tool factories ─────────────────────────────────────────────────────────────
 // Each factory closes over a mutable context object.
@@ -69,12 +73,12 @@ function createInterviewTools(context) {
       async ({ reasoning, follow_up_question }) => {
         // Guard: enforce no-double-followup even if agent ignores the instruction
         if (context.lastWasFollowup || context.followupCount >= 1) {
-          console.warn("  [InterviewAgent] Follow-up overridden — limit reached, forcing advance");
+          log.warn("Follow-up overridden — limit reached, forcing advance");
           context.decision = { action: "advance", verdict: "weak", reasoning: "Follow-up limit reached" };
           return { content: [{ type: "text", text: JSON.stringify({ overridden: true, reason: "follow-up limit already reached — you must call advance_to_next_question instead" }) }] };
         }
         if (context.currentQuestion?.category === "closing") {
-          console.warn("  [InterviewAgent] Follow-up overridden — closing question");
+          log.warn("Follow-up overridden — closing question");
           context.decision = { action: "advance", verdict: "adequate", reasoning: "Closing question — no follow-up" };
           return { content: [{ type: "text", text: JSON.stringify({ overridden: true, reason: "closing questions cannot have follow-ups — call advance_to_next_question" }) }] };
         }
@@ -106,12 +110,12 @@ function createInterviewTools(context) {
       async ({ reasoning, preliminary_verdict }) => {
         const answeredSoFar = context.currentIndex ?? 0;
         if (answeredSoFar < 3) {
-          console.warn("  [InterviewAgent] Early conclusion blocked — fewer than 3 questions answered");
+          log.warn("Early conclusion blocked — fewer than 3 questions answered");
           context.decision = { action: "advance", verdict: "weak", reasoning: "Early conclusion overridden — not enough evidence yet" };
           return { content: [{ type: "text", text: JSON.stringify({ overridden: true, reason: "need at least 3 answered questions before concluding early" }) }] };
         }
         context.decision = { action: "conclude_early", reasoning, preliminary_verdict };
-        console.log(`  [InterviewAgent] 🏁 Early conclusion (${preliminary_verdict}): "${reasoning.slice(0, 100)}"`);
+        log.info({ verdict: preliminary_verdict, reasoning: reasoning.slice(0, 100) }, "Early conclusion");
         return { content: [{ type: "text", text: JSON.stringify({ status: "concluded_early" }) }] };
       }
     ),
@@ -126,7 +130,7 @@ function createInterviewTools(context) {
       async ({ observation, severity }) => {
         if (!context.observations) context.observations = [];
         context.observations.push({ observation, severity, questionIndex: context.currentIndex ?? null });
-        console.log(`  [InterviewAgent] 📋 Concern (${severity}): "${observation.slice(0, 100)}"`);
+        log.info({ severity, observation: observation.slice(0, 100) }, "Cumulative concern noted");
         return { content: [{ type: "text", text: JSON.stringify({ recorded: true }) }] };
       }
     ),
@@ -143,7 +147,7 @@ function createReportTools(context) {
         preliminary_recommendation: z.enum(["strong_hire", "hire", "maybe", "no_hire"]),
       },
       async ({ reasoning: _reasoning, preliminary_recommendation }) => {
-        console.log(`  [InterviewAgent] 📝 Generating final report (${preliminary_recommendation})...`);
+        log.info({ recommendation: preliminary_recommendation }, "Generating final report");
         const report = await generateReport(context.sessionId);
         context.report = report;
         return { content: [{ type: "text", text: JSON.stringify({ status: "report_generated", sessionId: context.sessionId }) }] };
@@ -182,7 +186,7 @@ async function runAgentQuery({ prompt, tools, allowedTools, maxTurns = 10 }) {
             reasoning,
             focusAreas: block.input?.focus_areas || [],
           });
-          console.log(`  [InterviewAgent] ▶ ${block.name} — "${reasoning.slice(0, 100)}"`);
+          log.info({ tool: block.name, reasoning: reasoning.slice(0, 100) }, "Tool called");
         }
         if (block.type === "text" && block.text) {
           agentSummary = block.text;
@@ -190,7 +194,7 @@ async function runAgentQuery({ prompt, tools, allowedTools, maxTurns = 10 }) {
       }
     }
     if (msg.type === "result" && msg.subtype !== "success") {
-      console.warn(`  [InterviewAgent] Query ended early: ${msg.subtype}`);
+      log.warn({ subtype: msg.subtype }, "Query ended early");
     }
   }
 
@@ -206,6 +210,9 @@ async function runAgentQuery({ prompt, tools, allowedTools, maxTurns = 10 }) {
 export async function setupInterview({ sessionId, jdText, resumeText, jdSummary, resumeSummary, difficulty }) {
   const context = { sessionId, jdText, resumeText, jdSummary, resumeSummary, difficulty, questionBank: null };
 
+  const safeJd     = sanitizeInput(jdText, 4000);
+  const safeResume = sanitizeInput(resumeText, 4000);
+
   const { toolEvents, agentSummary } = await runAgentQuery({
     prompt: `You are an expert AI interviewer agent.
 
@@ -218,10 +225,10 @@ Instructions:
 Include a "reasoning" field in every tool call explaining your decision.
 
 Job Description:
-${jdText.slice(0, 4000)}
+${safeJd}
 
 Resume / CV:
-${resumeText.slice(0, 4000)}`,
+${safeResume}`,
     tools: createSetupTools(context),
     allowedTools: [
       "mcp__interview_tools__parse_documents",
@@ -303,7 +310,7 @@ Interview context:
 ${prevContext}
 
 Current question (Q${currentIndex + 1}): "${currentQuestion?.question}"
-Candidate's answer: "${transcript}"${followupWarning}
+Candidate's answer: "${sanitizeInput(transcript, 3000)}"${followupWarning}
 
 Your task (in order):
 1. Call mcp__interview_tools__evaluate_answer to score this answer

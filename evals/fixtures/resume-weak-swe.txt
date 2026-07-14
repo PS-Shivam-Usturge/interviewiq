@@ -1,0 +1,23 @@
+Alex Johnson
+alex.j@email.com
+
+SUMMARY
+Software developer with 2 years of experience. Looking to grow into a senior role.
+
+EXPERIENCE
+
+Software Developer — StartupXYZ, Remote (2022–Present)
+- Built REST APIs using Express.js
+- Worked on the company website using React
+- Fixed bugs in the existing codebase
+- Deployed apps to Heroku
+
+Junior Developer Intern — Local Agency, Austin (2021–2022)
+- Built WordPress sites for clients
+- Some JavaScript and PHP work
+
+EDUCATION
+B.S. Information Technology — State University (2022)
+
+SKILLS
+JavaScript, Node.js, React, HTML, CSS, MySQL, Git, Heroku

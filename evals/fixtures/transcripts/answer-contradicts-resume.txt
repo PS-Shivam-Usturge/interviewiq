@@ -1,0 +1,1 @@
+Yes, I've been leading a team of 10 engineers at Google for the past 5 years, working on large-scale ML infrastructure. We built systems processing billions of requests per day using Java and Spark. I have deep expertise in Kubernetes and have personally deployed hundreds of production services. I also have 8 years of experience with payments specifically.

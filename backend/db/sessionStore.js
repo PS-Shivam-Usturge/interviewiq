@@ -128,6 +128,36 @@ export async function appendAgentObservations(sessionId, newObservations) {
   });
 }
 
+export async function appendTrace(sessionId, events) {
+  if (!events?.length) return;
+  const result = await db.execute({
+    sql: "SELECT trace FROM sessions WHERE id = ?",
+    args: [sessionId],
+  });
+  const existing = safeJsonArray(result.rows[0]?.trace);
+  await db.execute({
+    sql: "UPDATE sessions SET trace = ? WHERE id = ?",
+    args: [JSON.stringify([...existing, ...events]), sessionId],
+  });
+}
+
+export async function getTrace(sessionId) {
+  const result = await db.execute({
+    sql: "SELECT trace, candidate_name, jd_summary, difficulty, status, created_at FROM sessions WHERE id = ?",
+    args: [sessionId],
+  });
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    events:        safeJsonArray(row.trace),
+    candidateName: row.candidate_name,
+    jdSummary:     safeJson(row.jd_summary),
+    difficulty:    row.difficulty,
+    status:        row.status,
+    createdAt:     row.created_at,
+  };
+}
+
 export async function getAgentObservations(sessionId) {
   const result = await db.execute({
     sql: "SELECT agent_observations FROM sessions WHERE id = ?",

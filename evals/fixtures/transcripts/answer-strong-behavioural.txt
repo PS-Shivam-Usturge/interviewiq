@@ -1,0 +1,5 @@
+At Stripe, I had a situation where a junior engineer on my team pushed a change that caused a 15-minute outage for our European merchants. It was a Friday evening and I was the on-call lead. First thing I did was roll back the change — we had a one-command rollback process, so services were restored in about 4 minutes. Then I wrote a brief incident summary for the stakeholders while my engineer started investigating the root cause.
+
+The most important part was how I handled the post-mortem. I made it explicitly blameless — the focus was entirely on the system failure, not the person. We found that our deployment pipeline had no automated canary check for European traffic specifically, so the regression wasn't caught. We added a regional canary stage and a smoke test for key European payment flows as a result.
+
+I also made a point of publicly recognising that my engineer did the right thing by raising the issue immediately and not trying to hide it. The team's trust in our incident process actually improved after that.

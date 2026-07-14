@@ -1,6 +1,9 @@
 import { createClient } from "@libsql/client";
 import path from "path";
 import { fileURLToPath } from "url";
+import logger from "../logger.js";
+
+const log = logger.child({ component: "DB" });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -66,12 +69,13 @@ export async function initDb() {
     "agent_history TEXT",
     "agent_observations TEXT",
     "concluded_early INTEGER DEFAULT 0",
+    "trace TEXT",
   ];
   for (const col of sessionCols) {
     const name = col.split(" ")[0];
     try {
       await db.execute(`ALTER TABLE sessions ADD COLUMN ${col}`);
-      console.log(`  DB migrated: added sessions.${name}`);
+      log.info({ column: `sessions.${name}` }, "DB migrated");
     } catch (_) { /* column already exists — fine */ }
   }
 
@@ -85,7 +89,7 @@ export async function initDb() {
     const name = col.split(" ")[0];
     try {
       await db.execute(`ALTER TABLE answers ADD COLUMN ${col}`);
-      console.log(`  DB migrated: added answers.${name}`);
+      log.info({ column: `answers.${name}` }, "DB migrated");
     } catch (_) { /* column already exists — fine */ }
   }
 
@@ -100,11 +104,11 @@ export async function initDb() {
     const name = col.split(" ")[0];
     try {
       await db.execute(`ALTER TABLE reports ADD COLUMN ${col}`);
-      console.log(`  DB migrated: added reports.${name}`);
+      log.info({ column: `reports.${name}` }, "DB migrated");
     } catch (_) { /* column already exists — fine */ }
   }
 
-  console.log("  DB initialised");
+  log.info("DB initialised");
 }
 
 export default db;

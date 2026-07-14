@@ -1,5 +1,8 @@
 import express from "express";
 import { getSession, getAnswers } from "../db/sessionStore.js";
+import logger from "../logger.js";
+
+const log = logger.child({ component: "MonitorRoute" });
 
 const router = express.Router();
 
@@ -76,7 +79,7 @@ router.get("/monitor/:sessionId", async (req, res) => {
         })),
       });
     } catch (err) {
-      console.error("Monitor SSE error:", err.message);
+      log.error({ err: err.message }, "Monitor SSE error");
     }
   }
 

@@ -4,6 +4,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { extractText, cleanupFile } from "../agents/parser.js";
 import { summariseJD, summariseResume } from "../agents/parseAgent.js";
+import logger from "../logger.js";
+
+const log = logger.child({ component: "ParseRoute" });
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -62,7 +65,7 @@ router.post(
         resume: { raw: resumeRaw, summary: resumeSummary },
       });
     } catch (err) {
-      console.error("Parse error:", err);
+      log.error({ err }, "Parse error");
       res.status(500).json({ error: "Failed to parse files. " + err.message });
     } finally {
       cleanupFile(jdFile?.path);

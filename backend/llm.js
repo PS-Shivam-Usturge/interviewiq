@@ -1,7 +1,10 @@
 import OpenAI from "openai";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import dotenv from "dotenv";
+import logger from "./logger.js";
 dotenv.config();
+
+const log = logger.child({ component: "LLM" });
 
 const PROVIDER = process.env.LLM_PROVIDER || "claude-sdk";
 
@@ -89,6 +92,8 @@ export async function chat(messages, opts = {}, retries = 4) {
   }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
     try {
       const res = await llm.chat.completions.create({
         model:           MODEL,
@@ -96,15 +101,25 @@ export async function chat(messages, opts = {}, retries = 4) {
         temperature:     opts.temperature ?? 0.7,
         max_tokens:      opts.maxTokens  ?? 8192,
         response_format: opts.json ? { type: "json_object" } : undefined,
-      });
+      }, { signal: controller.signal });
       return res.choices[0].message.content;
     } catch (err) {
+      if (err?.name === "AbortError") {
+        throw new Error("LLM request timed out after 30s");
+      }
       const isRateLimit = err?.status === 429;
       const isLast      = attempt === retries;
-      if (!isRateLimit || isLast) throw err;
+      if (!isRateLimit || isLast) {
+        const safeMessage = (err?.message || "LLM call failed")
+          .replace(/sk-[a-zA-Z0-9_-]+/g, "[REDACTED]")
+          .replace(/Bearer [a-zA-Z0-9_-]+/gi, "Bearer [REDACTED]");
+        throw new Error(safeMessage);
+      }
       const delay = Math.pow(2, attempt) * 1500;
-      console.warn(`Rate limited — retrying in ${delay / 1000}s (attempt ${attempt + 1}/${retries})`);
+      log.warn({ delaySec: delay / 1000, attempt: attempt + 1, retries }, "Rate limited — retrying");
       await sleep(delay);
+    } finally {
+      clearTimeout(timer);
     }
   }
 }
@@ -130,7 +145,7 @@ export async function chatWithTools(messages, tools, opts = {}, retries = 4) {
       const isLast      = attempt === retries;
       if (!isRateLimit || isLast) throw err;
       const delay = Math.pow(2, attempt) * 1500;
-      console.warn(`Rate limited — retrying in ${delay / 1000}s (attempt ${attempt + 1}/${retries})`);
+      log.warn({ delaySec: delay / 1000, attempt: attempt + 1, retries }, "Rate limited — retrying");
       await sleep(delay);
     }
   }
@@ -175,7 +190,7 @@ export function safeJsonParse(raw, label = "JSON") {
 
   try {
     const result = JSON.parse(repaired);
-    console.warn(`  [safeJsonParse] Repaired truncated ${label} response`);
+    log.warn({ label }, "Repaired truncated JSON response");
     return result;
   } catch (e) {
     throw new SyntaxError(`${label} could not be parsed even after repair: ${e.message}`);

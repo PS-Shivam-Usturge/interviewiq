@@ -5,11 +5,14 @@ import path from "path";
 import { fileURLToPath } from "url";
 import OpenAI from "openai";
 import dotenv from "dotenv";
+import { transcribeLimiter } from "../middleware/rateLimit.js";
+import logger from "../logger.js";
 dotenv.config();
 
 const router     = express.Router();
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const uploadDir  = path.join(__dirname, "../uploads");
+const log        = logger.child({ component: "Whisper" });
 
 // Groq client specifically for Whisper — uses Groq regardless of LLM_PROVIDER
 const groq = new OpenAI({
@@ -32,7 +35,7 @@ const upload = multer({
 // Body: multipart form — field "audio" with audio blob
 // Returns: { transcript: string }
 
-router.post("/transcribe", upload.single("audio"), async (req, res) => {
+router.post("/transcribe", transcribeLimiter, upload.single("audio"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No audio file received" });
   }
@@ -45,7 +48,7 @@ router.post("/transcribe", upload.single("audio"), async (req, res) => {
     const renamedPath = filePath + ".webm";
     fs.renameSync(filePath, renamedPath);
 
-    console.log(`  [Whisper] Transcribing ${(req.file.size / 1024).toFixed(0)}KB audio...`);
+    log.info({ sizeKb: Math.round(req.file.size / 1024) }, "Transcribing audio");
 
     const transcription = await groq.audio.transcriptions.create({
       file:  fs.createReadStream(renamedPath),
@@ -58,13 +61,13 @@ router.post("/transcribe", upload.single("audio"), async (req, res) => {
       ? transcription.trim()
       : (transcription?.text || "").trim();
 
-    console.log(`  [Whisper] Transcript: "${transcript.slice(0, 80)}..."`);
+    log.info({ preview: transcript.slice(0, 80) }, "Transcription complete");
 
     fs.unlinkSync(renamedPath);
     res.json({ transcript });
 
   } catch (err) {
-    console.error("Whisper transcription error:", err?.message || err);
+    log.error({ err: err?.message }, "Whisper transcription error");
     // Clean up file
     try { fs.unlinkSync(filePath); } catch (_) {}
     try { fs.unlinkSync(filePath + ".webm"); } catch (_) {}

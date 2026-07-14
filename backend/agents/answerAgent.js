@@ -1,5 +1,6 @@
 import { agentQuery } from "../agentClient.js";
 import { safeJsonParse } from "../llm.js";
+import { sanitizeInput } from "../utils/sanitize.js";
 
 export async function analyseAnswer({ question, answer, questionCategory, jdSummary }) {
   if (!answer || answer.trim().length < 10) {
@@ -15,6 +16,9 @@ export async function analyseAnswer({ question, answer, questionCategory, jdSumm
     };
   }
 
+  const safeAnswer   = sanitizeInput(answer, 2000);
+  const safeQuestion = sanitizeInput(question, 500);
+
   const prompt = `You are an expert technical interviewer scoring a candidate's answer.
 Be fair but rigorous. Base scores on the evidence in the answer only.
 Always respond with valid JSON only — no markdown, no explanation.
@@ -23,8 +27,8 @@ Score this interview answer.
 
 ROLE: ${jdSummary.role_title} (${jdSummary.seniority_level})
 QUESTION CATEGORY: ${questionCategory}
-QUESTION: "${question}"
-CANDIDATE ANSWER: "${answer.slice(0, 2000)}"
+QUESTION: "${safeQuestion}"
+CANDIDATE ANSWER: "${safeAnswer}"
 
 Return JSON with this exact structure:
 {

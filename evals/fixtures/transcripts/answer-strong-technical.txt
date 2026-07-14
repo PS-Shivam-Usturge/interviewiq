@@ -1,0 +1,7 @@
+Sure. When I was at Stripe, we had a critical issue where our payment authorization service was occasionally processing duplicate charges during network retries. The root cause was that our upstream clients were retrying on timeout, but the original request had already been processed — we just hadn't responded in time.
+
+The fix was a two-part solution. First, we implemented idempotency keys at the API layer — every payment request must include a client-generated idempotency key, which we store in a Redis cache with a 24-hour TTL. Before processing any payment, we check the cache. If the key exists, we return the cached response instead of re-processing. Second, for our internal Kafka consumers, we used exactly-once semantics combined with a deduplication table in PostgreSQL — the transaction ID is inserted with an INSERT OR IGNORE pattern before any side effects are applied.
+
+The tricky part was the race condition between checking the cache and writing to it. We solved that with a Redis SET NX (set if not exists) with a short expiry, which acts as a distributed lock during the initial processing window. Once the payment is confirmed, we update the key with the final response.
+
+After deploying, we saw duplicate payment incidents drop to zero over 3 months of monitoring. The solution added about 5ms of latency for the Redis roundtrip, which was well within our SLA.

@@ -1,0 +1,32 @@
+Senior Software Engineer — Payments Platform
+FinFlow Technologies | San Francisco, CA (Remote OK)
+
+About the Role
+We are looking for a Senior Software Engineer to join our Payments Platform team. You will design and build the core infrastructure that processes millions of transactions daily. This role requires deep expertise in distributed systems, a strong grasp of financial data consistency, and the ability to mentor junior engineers.
+
+Responsibilities
+- Design and implement scalable microservices for payment processing (authorization, settlement, reconciliation)
+- Own reliability and performance of critical payment flows — sub-200ms p99 latency target
+- Lead technical design reviews and establish coding standards for the team
+- Collaborate with product and compliance teams to meet PCI-DSS requirements
+- Drive incident response and post-mortems for production issues
+- Mentor 2–3 junior and mid-level engineers
+
+Required Skills
+- 5+ years of backend engineering experience
+- Strong proficiency in Node.js or Go (we use both)
+- Deep understanding of distributed systems: consensus, idempotency, eventual consistency
+- Experience with event-driven architectures (Kafka or similar)
+- PostgreSQL or another RDBMS at scale (schema design, query optimization, migrations)
+- REST and gRPC API design
+- Docker and Kubernetes in production
+
+Nice to Have
+- Experience in fintech or payments domain
+- Knowledge of PCI-DSS compliance
+- React for occasional frontend work
+- AWS (EKS, RDS, SQS)
+
+Seniority Level: Senior
+Team Size: 12 engineers
+Interview Process: 2 technical screens + system design + culture fit
