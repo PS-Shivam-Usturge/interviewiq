@@ -1,0 +1,10 @@
+[
+  { "category": "opening",     "question": "Walk me through the payment retry system you led at Stripe — what was your personal ownership versus the team's?" },
+  { "category": "opening",     "question": "What does a typical week look like for you as the lead of a four-person team?" },
+  { "category": "technical",   "question": "How did you guarantee idempotency for retried payment requests, and where were idempotency keys stored and expired?" },
+  { "category": "technical",   "question": "How would you achieve effectively-once processing of payment events with Kafka, and what failure cases remain?" },
+  { "category": "technical",   "question": "How do you keep a double-entry ledger in PostgreSQL consistent under concurrent writes?" },
+  { "category": "behavioural", "question": "Tell me about a time a junior engineer's change caused an incident. How did you handle it and the post-mortem?" },
+  { "category": "scenario",    "question": "Design a settlement pipeline that reconciles daily card-network files against your ledger and surfaces mismatches." },
+  { "category": "closing",     "question": "What would you want to learn about our payments platform before deciding to join?" }
+]

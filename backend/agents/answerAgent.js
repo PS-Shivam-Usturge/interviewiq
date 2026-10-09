@@ -1,9 +1,12 @@
 import { agentQuery } from "../agentClient.js";
 import { safeJsonParse } from "../llm.js";
 import { sanitizeInput } from "../utils/sanitize.js";
+import { checkContract } from "./contracts.js";
 
-export async function analyseAnswer({ question, answer, questionCategory, jdSummary }) {
-  if (!answer || answer.trim().length < 10) {
+export async function analyseAnswer({ question, answer, questionCategory, jdSummary = {}, resumeSummary }) {
+  // Deterministic guard (documented in README): empty or ~one-phrase answers need no LLM call
+  const wordCount = (answer || "").trim().split(/\s+/).filter(Boolean).length;
+  if (!answer || answer.trim().length < 10 || wordCount < 4) {
     return {
       score_technical:     0,
       score_communication: 0,
@@ -25,7 +28,9 @@ Always respond with valid JSON only — no markdown, no explanation.
 
 Score this interview answer.
 
-ROLE: ${jdSummary.role_title} (${jdSummary.seniority_level})
+ROLE: ${jdSummary?.role_title} (${jdSummary?.seniority_level})${resumeSummary?.skills?.length ? `
+CANDIDATE'S RESUME CLAIMS: ${resumeSummary.current_title || ""}, ${resumeSummary.years_total_experience ?? "?"} years; skills: ${sanitizeInput(resumeSummary.skills.slice(0, 12).join(", "), 600)}
+(Use this only to detect "contradicts_resume" — do not reward or penalise resume content itself.)` : ""}
 QUESTION CATEGORY: ${questionCategory}
 QUESTION: "${safeQuestion}"
 CANDIDATE ANSWER: "${safeAnswer}"
@@ -42,6 +47,6 @@ Return JSON with this exact structure:
   "analysis": "2-3 sentence plain English evaluation of this answer"
 }`;
 
-  const content = await agentQuery(prompt);
-  return safeJsonParse(content, "answer analysis");
+  const content = await agentQuery(prompt, { label: "answerAgent" });
+  return checkContract("answerAgent", safeJsonParse(content, "answer analysis"));
 }

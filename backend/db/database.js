@@ -70,6 +70,8 @@ export async function initDb() {
     "agent_observations TEXT",
     "concluded_early INTEGER DEFAULT 0",
     "trace TEXT",
+    "interview_memory TEXT",   // compact carried-forward state (agents/interviewMemory.js)
+    "agent_session_id TEXT",   // Claude Agent SDK session id, resumed on each turn
   ];
   for (const col of sessionCols) {
     const name = col.split(" ")[0];

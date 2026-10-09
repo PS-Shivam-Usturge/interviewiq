@@ -1,15 +1,18 @@
-import { agentQuery } from "../agentClient.js";
+import { agentQuery, AGENT_CONFIG } from "../agentClient.js";
 import { safeJsonParse } from "../llm.js";
 import { getSession, getAnswers } from "../db/sessionStore.js";
 import db from "../db/database.js";
 import { sanitizeInput } from "../utils/sanitize.js";
 import logger from "../logger.js";
+import { checkContract } from "./contracts.js";
 
 const log = logger.child({ component: "ReportAgent" });
 
 // ── Generate report ────────────────────────────────────────────────────────────
+// agentAssessment (optional): the orchestrator's own holistic view, passed through
+// from the generate_final_report tool call — { reasoning, preliminary_recommendation }.
 
-export async function generateReport(sessionId) {
+export async function generateReport(sessionId, { agentAssessment } = {}) {
   const session = await getSession(sessionId);
   if (!session) throw new Error("Session not found");
 
@@ -28,6 +31,24 @@ export async function generateReport(sessionId) {
 
   log.info({ sessionId, candidate: resumeS?.candidate_name, answers: answers.length }, "Generating report");
 
+  const report = await buildReport({
+    jdSummary:     jdS,
+    resumeSummary: resumeS,
+    answers,
+    observations:  session.agent_observations || [],
+    agentAssessment,
+  });
+
+  await storeReport(sessionId, report);
+
+  log.info({ sessionId, recommendation: report.recommendation, score: report.overall_score }, "Report generated");
+  return { ...report, sessionId, candidateName: resumeS?.candidate_name, roleTitle: jdS?.role_title };
+}
+
+// ── buildReport ────────────────────────────────────────────────────────────────
+// Pure sub-agent call (no DB): used by generateReport() and by the eval suite.
+
+export async function buildReport({ jdSummary: jdS, resumeSummary: resumeS, answers, observations = [], agentAssessment }) {
   const answerSummary = answers.map((a) => ({
     q:        a.question,
     category: a.question_category,
@@ -52,7 +73,14 @@ EXPERIENCE: ${resumeS?.years_total_experience} years
 
 INTERVIEW ANSWERS (${answerSummary.length} questions):
 ${JSON.stringify(answerSummary, null, 1)}
-
+${observations.length ? `
+CROSS-QUESTION OBSERVATIONS (recorded by the lead interviewer agent during the interview):
+${observations.map(o => `- [${o.severity}] ${sanitizeInput(o.observation || "", 400)}`).join("\n")}
+` : ""}${agentAssessment?.reasoning ? `
+LEAD INTERVIEWER'S ASSESSMENT (preliminary recommendation: ${agentAssessment.preliminary_recommendation || "n/a"}):
+${sanitizeInput(agentAssessment.reasoning, 1500)}
+Weigh this assessment against the answer evidence; if you disagree, say why in the narrative.
+` : ""}
 Return this exact JSON (no extra fields):
 {
   "overall_score": <0-100 integer>,
@@ -73,13 +101,8 @@ Return this exact JSON (no extra fields):
   "suggested_next_steps": ["e.g. Technical test on system design", "Reference check", "..."]
 }`;
 
-  const content = await agentQuery(prompt);
-  const report  = safeJsonParse(content, "eligibility report");
-
-  await storeReport(sessionId, report);
-
-  log.info({ sessionId, recommendation: report.recommendation, score: report.overall_score }, "Report generated");
-  return { ...report, sessionId, candidateName: resumeS?.candidate_name, roleTitle: jdS?.role_title };
+  const content = await agentQuery(prompt, { label: "reportAgent", effort: AGENT_CONFIG.effort.generation });
+  return checkContract("reportAgent", safeJsonParse(content, "eligibility report"));
 }
 
 // ── DB helpers ─────────────────────────────────────────────────────────────────

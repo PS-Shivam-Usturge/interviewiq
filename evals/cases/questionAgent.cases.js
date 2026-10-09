@@ -111,4 +111,48 @@ export default [
       prompt: (result) => `The following interview questions were generated for a Senior Software Engineer role at a fintech payments company.\n\nQuestions:\n${result.map((q, i) => `${i + 1}. [${q.category}] ${q.question}`).join("\n")}\n\nAre these questions relevant to payments, distributed systems, or backend engineering? Are they appropriately difficult for a senior engineer? Return JSON: { "pass": true/false, "score": 0-10, "reason": "..." }`,
     }],
   },
+  {
+    id: "question-011",
+    description: "LLM-judge (rubric, single-answer grading): question bank quality ≥3.5/5",
+    agent: "questionAgent",
+    fn: "generateQuestionBank",
+    input: { jdSummary, resumeSummary: strongResume, difficulty: "senior" },
+    assertions: [{
+      type: "llm_judge_rubric",
+      rubric: "question_bank",
+      task: () => `Write 8 senior-level interview questions for this role and candidate.\nROLE: ${JSON.stringify(jdSummary)}\nCANDIDATE: ${JSON.stringify(strongResume)}`,
+      output: (result) => result.map((q, i) => `${i + 1}. [${q.category}] ${q.question}`).join("\n"),
+    }],
+  },
+  {
+    id: "question-012",
+    description: "LLM-judge (pairwise, position-swapped): not worse than the golden reference bank",
+    agent: "questionAgent",
+    fn: "generateQuestionBank",
+    input: { jdSummary, resumeSummary: strongResume, difficulty: "senior" },
+    assertions: [{
+      type: "llm_judge_pairwise",
+      task: `Interview question bank (8 questions) for ${jdSummary.role_title} at a payments company; candidate ${strongResume.candidate_name}, ${strongResume.years_total_experience} years, skills ${strongResume.skills.join(", ")}.`,
+      criteria: "Relevance to the role, use of the candidate's background, senior-level depth, coverage of categories, clarity. Ignore length and formatting.",
+      candidate: (result) => result.map((q, i) => `${i + 1}. [${q.category}] ${q.question}`).join("\n"),
+      baseline: () => JSON.parse(fix("reference/question-bank-golden.json")).map((q, i) => `${i + 1}. [${q.category}] ${q.question}`).join("\n"),
+      allow: ["win", "tie"],
+    }],
+  },
+  {
+    id: "question-013",
+    description: "Orchestrator's focus areas steer the questions (agent decision has an effect)",
+    agent: "questionAgent",
+    fn: "generateQuestionBank",
+    input: {
+      jdSummary, resumeSummary: strongResume, difficulty: "senior",
+      focusAreas: ["Kafka exactly-once delivery", "PostgreSQL ledger consistency under concurrency"],
+      strategy: "Probe depth on event delivery guarantees and ledger correctness; the resume claims both.",
+    },
+    assertions: [{
+      type: "predicate",
+      label: "≥2 questions target the focus areas (kafka / ledger / exactly-once)",
+      fn: (result) => result.filter(q => /kafka|exactly[- ]once|ledger/i.test(q.question)).length >= 2,
+    }],
+  },
 ];

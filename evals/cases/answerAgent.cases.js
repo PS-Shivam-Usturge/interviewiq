@@ -163,4 +163,23 @@ export default [
       { type: "number_between", field: "overall_score",       min: 0, max: 10 },
     ],
   },
+  {
+    id: "answer-011",
+    description: "LLM-judge (rubric, reference-guided): vague answer is graded like the answer key",
+    agent: "answerAgent",
+    fn: "analyseAnswer",
+    input: {
+      question: "How have you ensured idempotency in a distributed payment system?",
+      answer: fix("transcripts/answer-weak-vague.txt"),
+      questionCategory: "technical",
+      jdSummary,
+    },
+    assertions: [{
+      type: "llm_judge_rubric",
+      rubric: "answer_evaluation",
+      task: () => `Score this candidate answer for a senior payments engineer role.\nQuestion: "How have you ensured idempotency in a distributed payment system?"\nAnswer: "${fix("transcripts/answer-weak-vague.txt").trim()}"`,
+      reference: "Expected overall grade band: 2-4 out of 10. Expected flags: vague and/or no_examples. Key weaknesses: no concrete mechanism (no idempotency keys, dedup store or constraints), no real example or numbers, 'caching' is not an idempotency strategy. Strength: correct one-line definition of idempotency.",
+      output: (result) => ({ overall_score: result.overall_score, score_technical: result.score_technical, flags: result.flags, analysis: result.analysis, gap_points: result.gap_points }),
+    }],
+  },
 ];

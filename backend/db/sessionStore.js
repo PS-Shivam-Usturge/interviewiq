@@ -37,6 +37,7 @@ export async function getSession(id) {
     resume_summary:     safeJson(row.resume_summary),
     question_bank:      safeJson(row.question_bank),
     agent_observations: safeJsonArray(row.agent_observations),
+    interview_memory:   safeJson(row.interview_memory),
     last_was_followup:  Number(row.last_was_followup || 0),
     followup_count:     Number(row.followup_count    || 0),
   };
@@ -170,6 +171,21 @@ export async function markConcludedEarly(sessionId) {
   await db.execute({
     sql: "UPDATE sessions SET concluded_early = 1 WHERE id = ?",
     args: [sessionId],
+  });
+}
+
+export async function saveInterviewMemory(sessionId, memory) {
+  await db.execute({
+    sql: "UPDATE sessions SET interview_memory = ? WHERE id = ?",
+    args: [JSON.stringify(memory), sessionId],
+  });
+}
+
+export async function saveAgentSessionId(sessionId, agentSessionId) {
+  if (!agentSessionId) return;
+  await db.execute({
+    sql: "UPDATE sessions SET agent_session_id = ? WHERE id = ?",
+    args: [agentSessionId, sessionId],
   });
 }
 

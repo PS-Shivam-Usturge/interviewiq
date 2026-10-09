@@ -1,0 +1,670 @@
+{
+  "runAt": "2026-10-09T10:26:56.756Z",
+  "provider": "claude-agent-sdk",
+  "filter": "all",
+  "judge": true,
+  "summary": {
+    "total": 56,
+    "passed": 56,
+    "passRate": 1
+  },
+  "byAgent": {
+    "parseAgent": {
+      "total": 10,
+      "passed": 10,
+      "passRate": 1
+    },
+    "questionAgent": {
+      "total": 13,
+      "passed": 13,
+      "passRate": 1
+    },
+    "answerAgent": {
+      "total": 11,
+      "passed": 11,
+      "passRate": 1
+    },
+    "reportAgent": {
+      "total": 11,
+      "passed": 11,
+      "passRate": 1
+    },
+    "orchestrator": {
+      "total": 10,
+      "passed": 10,
+      "passRate": 1
+    },
+    "interviewMemory": {
+      "total": 1,
+      "passed": 1,
+      "passRate": 1
+    }
+  },
+  "gates": {
+    "passThreshold": {
+      "required": 0.8,
+      "actual": 1,
+      "ok": true
+    },
+    "regression": {
+      "baseline": null,
+      "regressions": 0,
+      "ok": true
+    }
+  },
+  "regressions": [],
+  "fixedSinceBaseline": [],
+  "failures": [],
+  "cases": [
+    {
+      "id": "parse-001",
+      "agent": "parseAgent",
+      "description": "Valid SWE JD extracts role_title",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 11953
+    },
+    {
+      "id": "parse-002",
+      "agent": "parseAgent",
+      "description": "Valid SWE JD extracts required_skills array with ≥3 items",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 11933
+    },
+    {
+      "id": "parse-003",
+      "agent": "parseAgent",
+      "description": "Valid SWE JD extracts tech_stack",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 11933
+    },
+    {
+      "id": "parse-004",
+      "agent": "parseAgent",
+      "description": "Valid SWE JD extracts seniority_level",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 17
+    },
+    {
+      "id": "parse-005",
+      "agent": "parseAgent",
+      "description": "Strong SWE resume extracts candidate_name",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 10489
+    },
+    {
+      "id": "parse-006",
+      "agent": "parseAgent",
+      "description": "Strong SWE resume extracts years_total_experience ≥5",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 10473
+    },
+    {
+      "id": "parse-007",
+      "agent": "parseAgent",
+      "description": "Strong SWE resume extracts skills array with ≥5 items",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 10472
+    },
+    {
+      "id": "parse-008",
+      "agent": "parseAgent",
+      "description": "Weak SWE resume still extracts candidate_name without crashing",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 12939
+    },
+    {
+      "id": "parse-009",
+      "agent": "parseAgent",
+      "description": "Very short text does not crash summariseJD — returns partial output",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 8442
+    },
+    {
+      "id": "parse-010",
+      "agent": "parseAgent",
+      "description": "Strong SWE resume extracts current_title",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 1
+    },
+    {
+      "id": "question-001",
+      "agent": "questionAgent",
+      "description": "Generates exactly 8 questions for a strong SWE candidate",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 38880
+    },
+    {
+      "id": "question-002",
+      "agent": "questionAgent",
+      "description": "Question bank includes at least one 'technical' category question",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 30451
+    },
+    {
+      "id": "question-003",
+      "agent": "questionAgent",
+      "description": "Question bank includes at least one 'behavioural' category question",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 25964
+    },
+    {
+      "id": "question-004",
+      "agent": "questionAgent",
+      "description": "Question bank includes at least one 'opening' category question",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 0
+    },
+    {
+      "id": "question-005",
+      "agent": "questionAgent",
+      "description": "Question bank includes a 'closing' question",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 0
+    },
+    {
+      "id": "question-006",
+      "agent": "questionAgent",
+      "description": "Every question has a non-empty 'question' field",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 0
+    },
+    {
+      "id": "question-007",
+      "agent": "questionAgent",
+      "description": "Every question has a non-empty 'intent' field",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 20
+    },
+    {
+      "id": "question-008",
+      "agent": "questionAgent",
+      "description": "Generates questions for a weak candidate without crashing",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 33218
+    },
+    {
+      "id": "question-009",
+      "agent": "questionAgent",
+      "description": "Questions are not duplicates — all question texts are unique",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 0
+    },
+    {
+      "id": "question-010",
+      "agent": "questionAgent",
+      "description": "LLM-judge: questions are relevant to the payments/distributed-systems role",
+      "pass": true,
+      "failures": [],
+      "judge": [
+        {
+          "type": "llm_judge",
+          "pass": true,
+          "score": 9,
+          "reason": "All 8 questions are directly relevant to payments, distributed systems, and backend engineering. Questions 3 (exactly-once Kafka semantics), 4 (PostgreSQL write throughput degradation), 5 (zero-downtime stateful Kubernetes deployments), and 7 (incident response for order-processing lag) are specifically payments/fintech-appropriate and demand senior-level depth. The stack (Go, Kafka, PostgreSQL, Kubernetes) is consistent throughout and matches the role description. Difficulty is well-calibrated: questions probe architectural trade-offs (Q2, Q5), operational troubleshooting (Q4, Q7), and distributed systems guarantees (Q3) rather than trivia. Minor deduction: Q6 (mentoring) and Q8 (closing) are standard and add little technical differentiation, and Q1 is a broad opener that any senior engineer could answer generically without fintech specificity. Overall the set is strong and fit for purpose."
+        }
+      ],
+      "ms": 12833
+    },
+    {
+      "id": "question-011",
+      "agent": "questionAgent",
+      "description": "LLM-judge (rubric, single-answer grading): question bank quality ≥3.5/5",
+      "pass": true,
+      "failures": [],
+      "judge": [
+        {
+          "type": "rubric",
+          "pass": true,
+          "mean": 4.6,
+          "scores": {
+            "relevance": 5,
+            "personalisation": 4,
+            "difficulty_fit": 5,
+            "coverage": 5,
+            "clarity": 4
+          },
+          "reasons": {
+            "relevance": "All 8 questions map directly to stated requirements: microservice design (Q1,Q5), Kafka (Q3,Q7), PostgreSQL (Q4,Q5,Q7), Kubernetes (Q5,Q7), reliability ownership (Q7), mentoring (Q6).",
+            "personalisation": "Q1 probes candidate's 7-year trajectory and end-to-end ownership claim; Q2 exploits dual Go/Node.js skill to probe decision-making; Q4 targets PostgreSQL specifically listed in her skills. Multiple questions reference her exact stack rather than generic prompts.",
+            "difficulty_fit": "Questions assume senior-level depth: exactly-once Kafka semantics (Q3), zero-downtime stateful Kubernetes rollout (Q5), full diagnostic for PostgreSQL degradation (Q4). Appropriately complex for 7 years experience at senior level.",
+            "coverage": "Clear labelled categories: 2 opening, 3 technical, 1 behavioural, 1 scenario, 1 closing. No near-duplicates despite multiple Kafka/PostgreSQL appearances — each targets a distinct concern.",
+            "clarity": "Each question is a single focused prompt. Q4 has a slight multi-part structure ('diagnostic and remediation') but remains coherent and answerable. All others are crisp."
+          },
+          "rubric": "question_bank"
+        }
+      ],
+      "ms": 14039
+    },
+    {
+      "id": "question-012",
+      "agent": "questionAgent",
+      "description": "LLM-judge (pairwise, position-swapped): not worse than the golden reference bank",
+      "pass": true,
+      "failures": [],
+      "judge": [
+        {
+          "type": "pairwise",
+          "outcome": "tie",
+          "positionConsistent": false,
+          "rounds": [
+            {
+              "order": "candidate-first",
+              "winner": "A",
+              "reason": "Output B assumes specific details (Stripe, four-person team, specific projects) not provided in the task brief, making questions 1-3 potentially irrelevant or unanswerable. Output A uses only the stated background (Go, Node.js, PostgreSQL, Kafka, Kubernetes, gRPC, AWS, 7 years) and covers opening, technical depth, behavioural, scenario, and closing categories clearly. Output A's technical questions (exactly-once Kafka semantics, high-throughput PostgreSQL degradation, zero-downtime Kubernetes deployment) are appropriately senior and payments-relevant. Output B has stronger payments domain specificity (idempotency keys, double-entry ledger, settlement reconciliation) but the fabricated context undermines reliability. On balance, Output A is more dependably usable and criteria-compliant."
+            },
+            {
+              "order": "baseline-first",
+              "winner": "A",
+              "reason": "Output A is more tightly focused on the payments domain: idempotency keys, double-entry ledgers, settlement reconciliation, and card-network files are all payments-specific and directly relevant to a payments company role. Question 7 (settlement pipeline design) is a strong senior-level scenario unique to payments. Output B covers general microservices competencies (rolling deployments, query degradation, runtime choice) that are valid for any senior backend role but not payments-specific. Both use the candidate's stack well, but A's use of Kafka, PostgreSQL, and Go questions is framed around payment flows rather than generic distributed systems. Category coverage is comparable. On the criterion of 'relevance to the role' at a payments company, A wins clearly."
+            }
+          ]
+        }
+      ],
+      "ms": 20971
+    },
+    {
+      "id": "question-013",
+      "agent": "questionAgent",
+      "description": "Orchestrator's focus areas steer the questions (agent decision has an effect)",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 40864
+    },
+    {
+      "id": "answer-001",
+      "agent": "answerAgent",
+      "description": "Strong technical answer scores ≥7 on technical dimension",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 12551
+    },
+    {
+      "id": "answer-002",
+      "agent": "answerAgent",
+      "description": "Strong technical answer scores ≥6 overall",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 11945
+    },
+    {
+      "id": "answer-003",
+      "agent": "answerAgent",
+      "description": "Vague answer includes 'vague' in flags",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 10478
+    },
+    {
+      "id": "answer-004",
+      "agent": "answerAgent",
+      "description": "Vague answer scores ≤5 on technical dimension",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 10457
+    },
+    {
+      "id": "answer-005",
+      "agent": "answerAgent",
+      "description": "Empty/minimal answer returns overall_score of 0 and flags no_answer",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 0
+    },
+    {
+      "id": "answer-006",
+      "agent": "answerAgent",
+      "description": "Evasive answer is flagged as evasive",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 9714
+    },
+    {
+      "id": "answer-007",
+      "agent": "answerAgent",
+      "description": "Strong behavioural answer returns strength_points array with ≥1 item",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 13042
+    },
+    {
+      "id": "answer-008",
+      "agent": "answerAgent",
+      "description": "Result always contains required fields",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 0
+    },
+    {
+      "id": "answer-009",
+      "agent": "answerAgent",
+      "description": "Contradicting answer is flagged as contradicts_resume",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 11138
+    },
+    {
+      "id": "answer-010",
+      "agent": "answerAgent",
+      "description": "Score fields are all integers between 0 and 10",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 0
+    },
+    {
+      "id": "answer-011",
+      "agent": "answerAgent",
+      "description": "LLM-judge (rubric, reference-guided): vague answer is graded like the answer key",
+      "pass": true,
+      "failures": [],
+      "judge": [
+        {
+          "type": "rubric",
+          "pass": true,
+          "mean": 3.67,
+          "scores": {
+            "grade_agreement": 3,
+            "justification": 5,
+            "flag_accuracy": 3
+          },
+          "reasons": {
+            "grade_agreement": "Agent scored 1/10, reference band is 2-4/10. Just outside the band.",
+            "justification": "Agent caught no concrete mechanism, no real examples, and 'caching' being insufficient. Noted correct definition as barely adequate. Matches reference key points.",
+            "flag_accuracy": "Agent flagged 'vague' and 'no_examples' matching reference exactly, plus added 'overconfident' and 'evasive' which reference does not list."
+          },
+          "rubric": "answer_evaluation"
+        }
+      ],
+      "ms": 8318
+    },
+    {
+      "id": "report-001",
+      "agent": "reportAgent",
+      "description": "Report returns overall_score field (0–100)",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 36609
+    },
+    {
+      "id": "report-002",
+      "agent": "reportAgent",
+      "description": "All-high scores produce hire or strong_hire recommendation",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 37289
+    },
+    {
+      "id": "report-003",
+      "agent": "reportAgent",
+      "description": "All-low scores produce no_hire recommendation",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 37888
+    },
+    {
+      "id": "report-004",
+      "agent": "reportAgent",
+      "description": "Report contains strengths array with ≥1 item for high-scoring candidate",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 0
+    },
+    {
+      "id": "report-005",
+      "agent": "reportAgent",
+      "description": "Report contains gaps array with ≥1 item for low-scoring candidate",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 6817
+    },
+    {
+      "id": "report-006",
+      "agent": "reportAgent",
+      "description": "Report contains headline string",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 33687
+    },
+    {
+      "id": "report-007",
+      "agent": "reportAgent",
+      "description": "Report contains confidence field",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 29422
+    },
+    {
+      "id": "report-008",
+      "agent": "reportAgent",
+      "description": "Report contains skill_ratings array",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 29421
+    },
+    {
+      "id": "report-009",
+      "agent": "reportAgent",
+      "description": "Report contains narrative with ≥100 characters",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 19
+    },
+    {
+      "id": "report-010",
+      "agent": "reportAgent",
+      "description": "LLM-judge: narrative is coherent and references the candidate and role",
+      "pass": true,
+      "failures": [],
+      "judge": [
+        {
+          "type": "llm_judge",
+          "pass": true,
+          "score": 8,
+          "reason": "The narrative is coherent and well-structured, referencing the candidate (Priya Sharma) and role (Senior Software Engineer) throughout. It is specific in citing concrete evidence: idempotency keys with Redis, event sourcing with Kafka, missing Node.js and PostgreSQL coverage, communication scores of 7/10, and blameless post-mortems. It logically connects observations to conclusions and provides actionable next steps. Minor deduction for some repetition and the caveat that brevity of answers limits conclusions — which is itself a reasonable and specific observation."
+        }
+      ],
+      "ms": 9936
+    },
+    {
+      "id": "report-011",
+      "agent": "reportAgent",
+      "description": "LLM-judge (rubric): mixed interview + agent observations → grounded, calibrated report",
+      "pass": true,
+      "failures": [],
+      "judge": [
+        {
+          "type": "rubric",
+          "pass": true,
+          "mean": 5,
+          "scores": {
+            "evidence": 5,
+            "calibration": 5,
+            "balance": 5,
+            "usefulness": 5
+          },
+          "reasons": {
+            "evidence": "Nearly every claim is grounded in direct quotes or specific scores: idempotency gap cites 'making sure things don't happen twice' and 'caching'; Kafka gap cites exact quote 'Kafka handles that for you with its settings, I think'; strengths cite the 15-minute EU outage, blameless post-mortem, canary stage, and 9/10 communication scores.",
+            "calibration": "Overall score of 52/100 and 'maybe' recommendation align with two strong questions (scores ~7-8 avg) and two weak questions (scores ~3-4 avg). Narrative explicitly maps per-answer scores to the verdict.",
+            "balance": "Report covers genuine strengths (incident management, communication, leadership) with specific evidence, and gaps with equal specificity and direct quotes. No unsupported praise or unwarranted harshness.",
+            "usefulness": "Clear verdict ('maybe'), concrete next steps (Kafka take-home, PostgreSQL/Node screen, targeted reference check, system design interview), and explicit conditions under which hire would be recommended."
+          },
+          "rubric": "report"
+        }
+      ],
+      "ms": 57167
+    },
+    {
+      "id": "orch-001",
+      "agent": "orchestrator",
+      "description": "Vague technical answer (first ask) → agent requests a follow-up",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 33729
+    },
+    {
+      "id": "orch-002",
+      "agent": "orchestrator",
+      "description": "Strong technical answer → agent advances with a positive verdict",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 32262
+    },
+    {
+      "id": "orch-003",
+      "agent": "orchestrator",
+      "description": "Vague answer to a follow-up → agent must advance (one follow-up per question)",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 36662
+    },
+    {
+      "id": "orch-004",
+      "agent": "orchestrator",
+      "description": "Closing question → agent advances, never follows up",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 29005
+    },
+    {
+      "id": "orch-005",
+      "agent": "orchestrator",
+      "description": "Strong answer at Q2 → agent does not conclude early (insufficient evidence)",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 33575
+    },
+    {
+      "id": "orch-006",
+      "agent": "orchestrator",
+      "description": "Evasive technical answer → agent requests a follow-up",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 28923
+    },
+    {
+      "id": "orch-007",
+      "agent": "orchestrator",
+      "description": "Context engineering: follow-up answer is evaluated against the follow-up the agent asked",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 39679
+    },
+    {
+      "id": "orch-008",
+      "agent": "orchestrator",
+      "description": "Consistently weak candidate (memory) + another evasive answer → no positive verdict, concern or early stop",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 43583
+    },
+    {
+      "id": "orch-009",
+      "agent": "orchestrator",
+      "description": "LLM-judge (rubric): follow-up question targets the gap in a vague answer",
+      "pass": true,
+      "failures": [],
+      "judge": [
+        {
+          "type": "rubric",
+          "pass": true,
+          "mean": 4.67,
+          "scores": {
+            "targets_gap": 5,
+            "specificity": 5,
+            "neutrality": 4
+          },
+          "reasons": {
+            "targets_gap": "Candidate mentioned 'caching' vaguely without explaining the actual mechanism; question directly asks for the technical mechanism of idempotency key generation/storage or duplicate handling",
+            "specificity": "Asks for concrete examples: idempotency key generation, storage, database/service layer handling",
+            "neutrality": "Neutral and professional, offers examples as prompts without leading to a specific correct answer"
+          },
+          "rubric": "followup_question"
+        }
+      ],
+      "ms": 9698
+    },
+    {
+      "id": "orch-010",
+      "agent": "orchestrator",
+      "description": "Answer contradicting the resume → flagged and acted on (follow-up or recorded concern)",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 31775
+    },
+    {
+      "id": "memory-001",
+      "agent": "interviewMemory",
+      "description": "Context engineering: memory compacts old turns but keeps plan + concerns (no LLM)",
+      "pass": true,
+      "failures": [],
+      "judge": [],
+      "ms": 2
+    }
+  ]
+}

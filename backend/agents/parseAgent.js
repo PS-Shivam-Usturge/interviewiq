@@ -1,5 +1,6 @@
 import { agentQuery } from "../agentClient.js";
 import { safeJsonParse } from "../llm.js";
+import { checkContract } from "./contracts.js";
 
 export async function summariseJD(rawText) {
   const prompt = `You are a recruitment analyst. Extract structured information from job descriptions.
@@ -20,8 +21,8 @@ Extract the following from this job description and return as JSON:
 Job Description:
 ${rawText.slice(0, 6000)}`;
 
-  const content = await agentQuery(prompt);
-  return safeJsonParse(content, "JD summary");
+  const content = await agentQuery(prompt, { label: "parseAgent.jd" });
+  return checkContract("parseAgent", safeJsonParse(content, "JD summary"), "jd");
 }
 
 export async function summariseResume(rawText) {
@@ -44,6 +45,6 @@ Extract the following from this resume and return as JSON:
 Resume:
 ${rawText.slice(0, 6000)}`;
 
-  const content = await agentQuery(prompt);
-  return safeJsonParse(content, "resume summary");
+  const content = await agentQuery(prompt, { label: "parseAgent.resume" });
+  return checkContract("parseAgent", safeJsonParse(content, "resume summary"), "resume");
 }

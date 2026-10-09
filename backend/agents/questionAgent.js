@@ -1,13 +1,14 @@
-import { agentQuery } from "../agentClient.js";
+import { agentQuery, AGENT_CONFIG } from "../agentClient.js";
 import { safeJsonParse } from "../llm.js";
 import { sanitizeInput } from "../utils/sanitize.js";
+import { checkContract } from "./contracts.js";
 import logger from "../logger.js";
 
 const log = logger.child({ component: "QuestionAgent" });
 
 // ── Question bank generation ───────────────────────────────────────────────────
 
-export async function generateQuestionBank({ jdSummary, resumeSummary, difficulty }) {
+export async function generateQuestionBank({ jdSummary, resumeSummary, difficulty, focusAreas = [], strategy = "" }) {
   const difficultyGuide = {
     junior:    "Focus on fundamentals, basic concepts, and learning mindset. Avoid deep architecture questions.",
     mid:       "Mix of applied skills, problem-solving, and some design decisions. Expect solid hands-on experience.",
@@ -18,6 +19,18 @@ export async function generateQuestionBank({ jdSummary, resumeSummary, difficult
   const safeRole        = sanitizeInput(jdSummary.role_title || "", 200);
   const safeCandidate   = sanitizeInput(resumeSummary.candidate_name || "", 100);
   const safeTitle       = sanitizeInput(resumeSummary.current_title || "", 100);
+
+  // Interview plan chosen by the orchestrating agent (generate_question_bank tool args)
+  const safeFocus    = (focusAreas || []).slice(0, 5).map(f => sanitizeInput(String(f), 120)).filter(Boolean);
+  const safeStrategy = sanitizeInput(strategy || "", 600);
+  const planBlock = safeFocus.length || safeStrategy
+    ? `
+INTERVIEWER'S PLAN (decided by the lead interviewer agent — follow it):
+${safeFocus.length ? `- Focus areas to probe: ${safeFocus.join("; ")}` : ""}
+${safeStrategy ? `- Strategy: ${safeStrategy}` : ""}
+- Each technical question should target one of the focus areas; the scenario question should combine two of them.
+`
+    : "";
 
   const prompt = `You are an expert technical interviewer at a top-tier tech company.
 You create precise, relevant interview questions tailored to the specific role and candidate.
@@ -37,7 +50,7 @@ EXPERIENCE: ${resumeSummary.years_total_experience} years
 CANDIDATE SKILLS: ${resumeSummary.skills?.slice(0, 10).join(", ")}
 
 DIFFICULTY: ${difficulty} — ${difficultyGuide[difficulty] || difficultyGuide.mid}
-
+${planBlock}
 Return this exact JSON structure (no extra fields):
 {
   "opening": [
@@ -65,7 +78,7 @@ Rules:
 - Reference their actual background where relevant
 - Total: 2 opening + 3 technical + 1 behavioural + 1 scenario + 1 closing = 8 questions`;
 
-  const content = await agentQuery(prompt);
+  const content = await agentQuery(prompt, { label: "questionAgent", effort: AGENT_CONFIG.effort.generation });
   const bank = safeJsonParse(content, "question bank");
 
   // Flatten into ordered array
@@ -79,7 +92,7 @@ Rules:
 
   if (ordered.length === 0) throw new Error("Question bank generation returned no questions");
 
-  log.info({ count: ordered.length }, "Generated question bank");
-  return ordered;
+  log.info({ count: ordered.length, focusAreas: safeFocus }, "Generated question bank");
+  return checkContract("questionAgent", ordered);
 }
 

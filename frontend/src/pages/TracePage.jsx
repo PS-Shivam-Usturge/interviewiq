@@ -117,10 +117,10 @@ function EventCard({ ev, index }) {
       <div style={cardStyle("var(--accent)")}>
         <button style={expandBtn} onClick={() => setOpen(o => !o)}>
           <div style={cardHeader}>
-            <span style={{ fontSize: 16 }}>{TOOL_ICON[ev.tool] || "🔧"}</span>
+            <span style={{ fontSize: 16 }}>{TOOL_ICON[ev.tool?.replace("mcp__interview_tools__", "")] || "🔧"}</span>
             <div style={{ flex: 1 }}>
               <code style={{ fontSize: 13, color: "var(--accent)" }}>{ev.tool}</code>
-              <Tag label="setup" color="var(--accent)" />
+              <Tag label={ev.phase || "setup"} color="var(--accent)" />
             </div>
             <span style={{ fontSize: 11, color: "var(--text-3)" }}>{fmt(ev.time)}</span>
             <span style={{ color: "var(--text-3)", fontSize: 12 }}>{open ? "▲" : "▼"}</span>

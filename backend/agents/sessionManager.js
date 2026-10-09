@@ -1,9 +1,11 @@
-import { setupInterview, processAnswer } from "./interviewAgent.js";
+import { setupInterview, processAnswer, generateAgentReport } from "./interviewAgent.js";
+import { getStoredReport } from "./reportAgent.js";
 import {
   createSession, getSession, getAnswers,
   saveQuestionBank, updateParsedSummaries,
   advanceQuestion, markFollowUp, saveAnswer, completeSession,
   appendAgentObservations, markConcludedEarly, appendTrace,
+  saveInterviewMemory, saveAgentSessionId,
 } from "../db/sessionStore.js";
 import logger from "../logger.js";
 
@@ -48,6 +50,8 @@ export async function startSession({ jdText, resumeText, jdSummary, resumeSummar
     result.resumeSummary?.candidate_name,
   );
   await saveQuestionBank(sessionId, result.questionBank);
+  await saveInterviewMemory(sessionId, result.memory);
+  await saveAgentSessionId(sessionId, result.agentSessionId);
 
   // Persist agent setup trace
   const setupTrace = [
@@ -82,7 +86,8 @@ export async function startSession({ jdText, resumeText, jdSummary, resumeSummar
     currentQuestion: result.questionBank[0],
     status: "active",
     agentSetup: {
-      focusAreas:   result.toolEvents?.find(e => e.tool === "generate_question_bank")?.focusAreas || [],
+      // SDK reports MCP tools as mcp__interview_tools__<name>
+      focusAreas:   result.toolEvents?.find(e => e.tool.endsWith("generate_question_bank"))?.focusAreas || [],
       agentSummary: result.agentSummary,
       toolEvents:   result.toolEvents,
     },
@@ -121,11 +126,15 @@ export async function submitAnswer({ sessionId, transcript }) {
     log.info({ sessionId, count: observations.length }, "Saved cumulative observations");
   }
 
+  // Persist carried-forward state for the next turn (context engineering + SDK session)
+  await saveInterviewMemory(sessionId, result.memory);
+  await saveAgentSessionId(sessionId, result.agentSessionId);
+
   // Persist the answer with agent reasoning embedded in the analysis field
   await saveAnswer({
     sessionId,
     questionIndex:     currentIndex,
-    question:          currentQuestion.question,
+    question:          result.askedQuestion || currentQuestion.question,
     questionCategory:  currentQuestion.category,
     transcript,
     scoreTechnical:     evaluation.score_technical     || 0,
@@ -179,7 +188,7 @@ export async function submitAnswer({ sessionId, transcript }) {
   const answerTrace = [
     { time: now(), phase: "interview", event: "evaluation",
       questionIndex: currentIndex,
-      question: currentQuestion.question,
+      question: result.askedQuestion || currentQuestion.question,
       category: currentQuestion.category,
       scores: {
         technical:     evaluation.score_technical,
@@ -245,6 +254,62 @@ export async function submitAnswer({ sessionId, transcript }) {
   };
 }
 
+// ── getOrGenerateReport ───────────────────────────────────────────────────────
+// Shared by GET /api/report/:id and the A2A get_report skill.
+// Throws errors with a `status` property so callers can map them to HTTP/A2A errors.
+
+// Concurrent requests for the same report (e.g. React StrictMode double effects, two HR tabs)
+// share one in-flight generation instead of running the agent twice.
+const reportsInFlight = new Map();
+
+export function getOrGenerateReport(sessionId) {
+  if (!reportsInFlight.has(sessionId)) {
+    const job = loadOrGenerateReport(sessionId).finally(() => reportsInFlight.delete(sessionId));
+    reportsInFlight.set(sessionId, job);
+  }
+  return reportsInFlight.get(sessionId);
+}
+
+async function loadOrGenerateReport(sessionId) {
+  const session = await getSession(sessionId);
+  if (!session) throw Object.assign(new Error("Session not found"), { status: 404 });
+  if (session.status !== "completed") {
+    throw Object.assign(
+      new Error("Interview is not yet completed — report cannot be generated until the candidate finishes."),
+      { status: 400 },
+    );
+  }
+
+  // Return cached report immediately — report generation is expensive.
+  // The reports table has no name/role columns, so add them from the session.
+  const cached = await getStoredReport(sessionId);
+  if (cached) {
+    return {
+      ...cached,
+      sessionId,
+      candidateName: session.resume_summary?.candidate_name || session.candidate_name,
+      roleTitle:     session.jd_summary?.role_title,
+    };
+  }
+
+  const result = await generateAgentReport({ sessionId, session });
+  if (!result.report) throw Object.assign(new Error("Agent did not produce a report"), { status: 500 });
+
+  await appendTrace(sessionId, [
+    ...(result.toolEvents || []).map(ev => ({
+      time: now(), phase: "report", event: "tool_call",
+      tool: ev.tool, reasoning: ev.reasoning || "", focusAreas: [],
+    })),
+    { time: now(), phase: "report", event: "report_generated",
+      recommendation: result.report.recommendation,
+      overallScore:   result.report.overall_score,
+      confidence:     result.report.confidence,
+      headline:       result.report.headline },
+  ]);
+
+  return result.report;
+}
+
 // ── getSessionState ───────────────────────────────────────────────────────────
 // Called by GET /api/session/:id (HR monitor + interview room)
 
@@ -254,11 +319,16 @@ export async function getSessionState(sessionId) {
 
   const answers         = await getAnswers(sessionId);
   const questions       = session.question_bank || [];
-  const currentQuestion = questions[session.current_question_index] || null;
+  // On a page refresh during a follow-up, resume with the follow-up the agent asked
+  const pending         = session.interview_memory?.pendingFollowUp;
+  const currentQuestion = session.last_was_followup === 1 && pending?.index === session.current_question_index
+    ? { id: `followup_${pending.index}`, index: pending.index, category: "follow_up", question: pending.question, follow_ups: [] }
+    : questions[session.current_question_index] || null;
 
   return {
     sessionId:      session.id,
     candidateName:  session.candidate_name,
+    roleTitle:      session.jd_summary?.role_title || null,
     difficulty:     session.difficulty,
     status:         session.status,
     totalQuestions: session.total_questions,

@@ -46,7 +46,11 @@ router.get("/monitor/:sessionId", async (req, res) => {
       const answers  = await getAnswers(sessionId);
       const live     = liveTranscripts.get(sessionId);
       const questions = session.question_bank || [];
-      const currentQ  = questions[session.current_question_index] || null;
+      // While a follow-up is pending, show the follow-up the agent actually asked
+      const pending   = session.interview_memory?.pendingFollowUp;
+      const currentQ  = session.last_was_followup === 1 && pending?.index === session.current_question_index
+        ? { question: pending.question, category: "follow_up" }
+        : questions[session.current_question_index] || null;
 
       send({
         sessionId,

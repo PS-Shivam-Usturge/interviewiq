@@ -6,8 +6,9 @@ export function authMiddleware(req, res, next) {
   // Auth disabled when API_KEYS is not set (dev mode)
   if (allowedKeys.length === 0) return next();
 
-  // Health endpoint always exempt
+  // Health endpoint and the public A2A discovery card are always exempt
   if (req.method === "GET" && req.path === "/api/health") return next();
+  if (req.method === "GET" && req.path === "/.well-known/agent-card.json") return next();
 
   const key = req.headers["x-api-key"];
   if (!key || !allowedKeys.includes(key)) {

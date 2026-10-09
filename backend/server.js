@@ -18,6 +18,7 @@ import reportRoute     from "./routes/report.js";
 import transcribeRoute from "./routes/transcribe.js";
 import monitorRoute    from "./routes/monitor.js";
 import traceRoute      from "./routes/trace.js";
+import { mountA2A }    from "./a2a/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app  = express();
@@ -33,8 +34,9 @@ app.use(authMiddleware);
 
 app.get("/api/health", (_, res) => res.json({
   status:   "ok",
-  provider: process.env.LLM_PROVIDER || "groq",
+  provider: "claude-agent-sdk",
   phase:    3,
+  a2a:      "/.well-known/agent-card.json",
 }));
 
 app.use("/api", parseRoute);
@@ -44,6 +46,9 @@ app.use("/api", transcribeRoute);
 app.use("/api", monitorRoute);
 app.use("/api", traceRoute);
 
+// A2A interface — /.well-known/agent-card.json + /a2a/jsonrpc (see backend/a2a/)
+mountA2A(app);
+
 app.use((err, _req, res, _next) => {
   log.error({ err }, "Unhandled error");
   res.status(500).json({ error: err.message || "Internal server error" });
@@ -52,5 +57,5 @@ app.use((err, _req, res, _next) => {
 await initDb();
 
 app.listen(PORT, () => {
-  log.info({ port: PORT, provider: process.env.LLM_PROVIDER || "groq" }, "Interview Agent API started");
+  log.info({ port: PORT, provider: "claude-agent-sdk" }, "Interview Agent API started");
 });
