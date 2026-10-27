@@ -2,6 +2,7 @@ import { agentQuery } from "../agentClient.js";
 import { safeJsonParse } from "../llm.js";
 import { sanitizeInput } from "../utils/sanitize.js";
 import { checkContract } from "./contracts.js";
+import { prompt, render } from "../prompts/index.js";
 
 export async function analyseAnswer({ question, answer, questionCategory, jdSummary = {}, resumeSummary }) {
   // Deterministic guard (documented in README): empty or ~one-phrase answers need no LLM call
@@ -22,31 +23,25 @@ export async function analyseAnswer({ question, answer, questionCategory, jdSumm
   const safeAnswer   = sanitizeInput(answer, 2000);
   const safeQuestion = sanitizeInput(question, 500);
 
-  const prompt = `You are an expert technical interviewer scoring a candidate's answer.
-Be fair but rigorous. Base scores on the evidence in the answer only.
-Always respond with valid JSON only — no markdown, no explanation.
+  // Prompts: backend/prompts/answerAgent/{system,user,resume-claims}.md
+  const resumeClaims = resumeSummary?.skills?.length
+    ? render("answerAgent/resume-claims", {
+        current_title: resumeSummary.current_title || "",
+        years:         resumeSummary.years_total_experience ?? "?",
+        skills:        sanitizeInput(resumeSummary.skills.slice(0, 12).join(", "), 600),
+      })
+    : "";
 
-Score this interview answer.
-
-ROLE: ${jdSummary?.role_title} (${jdSummary?.seniority_level})${resumeSummary?.skills?.length ? `
-CANDIDATE'S RESUME CLAIMS: ${resumeSummary.current_title || ""}, ${resumeSummary.years_total_experience ?? "?"} years; skills: ${sanitizeInput(resumeSummary.skills.slice(0, 12).join(", "), 600)}
-(Use this only to detect "contradicts_resume" — do not reward or penalise resume content itself.)` : ""}
-QUESTION CATEGORY: ${questionCategory}
-QUESTION: "${safeQuestion}"
-CANDIDATE ANSWER: "${safeAnswer}"
-
-Return JSON with this exact structure:
-{
-  "score_technical": <0-10, technical correctness and accuracy>,
-  "score_communication": <0-10, clarity, structure, conciseness>,
-  "score_depth": <0-10, depth of understanding, not just surface level>,
-  "overall_score": <0-10, weighted average>,
-  "strength_points": ["what the candidate did well"],
-  "gap_points": ["what was missing or weak"],
-  "flags": <array of zero or more: "vague", "inaccurate", "contradicts_resume", "no_examples", "overconfident", "underconfident", "evasive">,
-  "analysis": "2-3 sentence plain English evaluation of this answer"
-}`;
-
-  const content = await agentQuery(prompt, { label: "answerAgent" });
+  const content = await agentQuery(
+    render("answerAgent/user", {
+      role_title:    jdSummary?.role_title ?? "",
+      seniority:     jdSummary?.seniority_level ?? "",
+      resume_claims: resumeClaims,
+      category:      questionCategory ?? "",
+      question:      safeQuestion,
+      answer:        safeAnswer,
+    }),
+    { label: "answerAgent", systemPrompt: prompt("answerAgent/system") },
+  );
   return checkContract("answerAgent", safeJsonParse(content, "answer analysis"));
 }

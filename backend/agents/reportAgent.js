@@ -5,6 +5,7 @@ import db from "../db/database.js";
 import { sanitizeInput } from "../utils/sanitize.js";
 import logger from "../logger.js";
 import { checkContract } from "./contracts.js";
+import { prompt, render } from "../prompts/index.js";
 
 const log = logger.child({ component: "ReportAgent" });
 
@@ -58,50 +59,34 @@ export async function buildReport({ jdSummary: jdS, resumeSummary: resumeS, answ
     analysis: a.analysis,
   }));
 
-  const prompt = `You are a senior hiring manager writing a formal candidate eligibility report.
-Be honest, balanced, and evidence-based. Every claim must reference something the candidate actually said.
-Always respond with valid JSON only — no markdown, no explanation.
+  // Prompts: backend/prompts/reportAgent/{system,user,observations,assessment}.md
+  const observationsBlock = observations.length
+    ? render("reportAgent/observations", {
+        observation_lines: observations.map(o => `- [${o.severity}] ${sanitizeInput(o.observation || "", 400)}`).join("\n"),
+      })
+    : "";
+  const assessmentBlock = agentAssessment?.reasoning
+    ? render("reportAgent/assessment", {
+        recommendation: agentAssessment.preliminary_recommendation || "n/a",
+        reasoning:      sanitizeInput(agentAssessment.reasoning, 1500),
+      })
+    : "";
 
-Generate a complete eligibility report for this candidate.
-
-ROLE APPLIED FOR: ${jdS?.role_title} (${jdS?.seniority_level})
-REQUIRED SKILLS: ${jdS?.required_skills?.join(", ")}
-
-CANDIDATE: ${resumeS?.candidate_name}
-CURRENT TITLE: ${resumeS?.current_title}
-EXPERIENCE: ${resumeS?.years_total_experience} years
-
-INTERVIEW ANSWERS (${answerSummary.length} questions):
-${JSON.stringify(answerSummary, null, 1)}
-${observations.length ? `
-CROSS-QUESTION OBSERVATIONS (recorded by the lead interviewer agent during the interview):
-${observations.map(o => `- [${o.severity}] ${sanitizeInput(o.observation || "", 400)}`).join("\n")}
-` : ""}${agentAssessment?.reasoning ? `
-LEAD INTERVIEWER'S ASSESSMENT (preliminary recommendation: ${agentAssessment.preliminary_recommendation || "n/a"}):
-${sanitizeInput(agentAssessment.reasoning, 1500)}
-Weigh this assessment against the answer evidence; if you disagree, say why in the narrative.
-` : ""}
-Return this exact JSON (no extra fields):
-{
-  "overall_score": <0-100 integer>,
-  "technical_score": <0-100>,
-  "communication_score": <0-100>,
-  "problem_solving_score": <0-100>,
-  "culture_fit_score": <0-100>,
-  "recommendation": "strong_hire | hire | maybe | no_hire",
-  "confidence": "high | medium | low",
-  "headline": "One sentence verdict (e.g. Strong mid-level candidate with solid React fundamentals but thin system design experience)",
-  "strengths": ["specific strength with evidence", "..."],
-  "gaps": ["specific gap with evidence", "..."],
-  "red_flags": ["any concerning patterns, or empty array"],
-  "skill_ratings": [
-    { "skill": "skill name from JD", "rating": <1-5>, "evidence": "what the candidate said" }
-  ],
-  "narrative": "3-4 paragraph detailed evaluation. Be specific. Reference actual answers. First paragraph: overall impression. Second: technical assessment. Third: soft skills and culture fit. Fourth: recommendation and suggested next steps.",
-  "suggested_next_steps": ["e.g. Technical test on system design", "Reference check", "..."]
-}`;
-
-  const content = await agentQuery(prompt, { label: "reportAgent", effort: AGENT_CONFIG.effort.generation });
+  const content = await agentQuery(
+    render("reportAgent/user", {
+      role_title:      jdS?.role_title ?? "",
+      seniority:       jdS?.seniority_level ?? "",
+      required_skills: (jdS?.required_skills || []).join(", "),
+      candidate_name:  resumeS?.candidate_name ?? "the candidate",
+      current_title:   resumeS?.current_title ?? "",
+      years:           resumeS?.years_total_experience ?? "unknown",
+      answer_count:    answerSummary.length,
+      answers_json:    JSON.stringify(answerSummary, null, 1),
+      observations:    observationsBlock,
+      assessment:      assessmentBlock,
+    }),
+    { label: "reportAgent", systemPrompt: prompt("reportAgent/system"), effort: AGENT_CONFIG.effort.generation },
+  );
   return checkContract("reportAgent", safeJsonParse(content, "eligibility report"));
 }
 

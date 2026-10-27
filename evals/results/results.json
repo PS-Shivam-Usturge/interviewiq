@@ -1,5 +1,5 @@
 {
-  "runAt": "2026-10-09T10:26:56.756Z",
+  "runAt": "2026-10-27T08:18:55.768Z",
   "provider": "claude-agent-sdk",
   "filter": "all",
   "judge": true,
@@ -47,7 +47,7 @@
       "ok": true
     },
     "regression": {
-      "baseline": null,
+      "baseline": "2026-10-09T10:26:56.756Z",
       "regressions": 0,
       "ok": true
     }
@@ -63,7 +63,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 11953
+      "ms": 11706
     },
     {
       "id": "parse-002",
@@ -72,7 +72,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 11933
+      "ms": 11686
     },
     {
       "id": "parse-003",
@@ -81,7 +81,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 11933
+      "ms": 11686
     },
     {
       "id": "parse-004",
@@ -90,7 +90,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 17
+      "ms": 11
     },
     {
       "id": "parse-005",
@@ -99,7 +99,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 10489
+      "ms": 12781
     },
     {
       "id": "parse-006",
@@ -108,7 +108,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 10473
+      "ms": 12771
     },
     {
       "id": "parse-007",
@@ -117,7 +117,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 10472
+      "ms": 12770
     },
     {
       "id": "parse-008",
@@ -126,7 +126,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 12939
+      "ms": 15460
     },
     {
       "id": "parse-009",
@@ -135,7 +135,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 8442
+      "ms": 9764
     },
     {
       "id": "parse-010",
@@ -153,7 +153,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 38880
+      "ms": 47633
     },
     {
       "id": "question-002",
@@ -162,7 +162,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 30451
+      "ms": 37883
     },
     {
       "id": "question-003",
@@ -171,7 +171,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 25964
+      "ms": 32196
     },
     {
       "id": "question-004",
@@ -207,7 +207,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 20
+      "ms": 10
     },
     {
       "id": "question-008",
@@ -216,7 +216,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 33218
+      "ms": 36365
     },
     {
       "id": "question-009",
@@ -225,7 +225,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 0
+      "ms": 1
     },
     {
       "id": "question-010",
@@ -238,10 +238,10 @@
           "type": "llm_judge",
           "pass": true,
           "score": 9,
-          "reason": "All 8 questions are directly relevant to payments, distributed systems, and backend engineering. Questions 3 (exactly-once Kafka semantics), 4 (PostgreSQL write throughput degradation), 5 (zero-downtime stateful Kubernetes deployments), and 7 (incident response for order-processing lag) are specifically payments/fintech-appropriate and demand senior-level depth. The stack (Go, Kafka, PostgreSQL, Kubernetes) is consistent throughout and matches the role description. Difficulty is well-calibrated: questions probe architectural trade-offs (Q2, Q5), operational troubleshooting (Q4, Q7), and distributed systems guarantees (Q3) rather than trivia. Minor deduction: Q6 (mentoring) and Q8 (closing) are standard and add little technical differentiation, and Q1 is a broad opener that any senior engineer could answer generically without fintech specificity. Overall the set is strong and fit for purpose."
+          "reason": "All 8 questions are directly relevant to backend engineering and distributed systems (Kafka lag investigation, PostgreSQL scaling, Go/Kubernetes debugging, microservice decomposition), with clear fintech/payments applicability in the data ownership and schema migration scenario. Difficulty is well-calibrated for senior level: questions demand systemic thinking (Q3 Kafka remediation, Q4 PostgreSQL levers), operational judgment (Q5 on-call debugging), and architectural trade-offs (Q7 monolith decomposition with shared schema). The behavioural and closing questions are standard but appropriate. Minor gap: only Q7 has an explicit payments-domain framing; the others are general distributed systems/backend, though all are highly applicable to a fintech payments context. No question is too easy or purely trivia-based."
         }
       ],
-      "ms": 12833
+      "ms": 13614
     },
     {
       "id": "question-011",
@@ -253,25 +253,25 @@
         {
           "type": "rubric",
           "pass": true,
-          "mean": 4.6,
+          "mean": 4.8,
           "scores": {
             "relevance": 5,
             "personalisation": 4,
             "difficulty_fit": 5,
             "coverage": 5,
-            "clarity": 4
+            "clarity": 5
           },
           "reasons": {
-            "relevance": "All 8 questions map directly to stated requirements: microservice design (Q1,Q5), Kafka (Q3,Q7), PostgreSQL (Q4,Q5,Q7), Kubernetes (Q5,Q7), reliability ownership (Q7), mentoring (Q6).",
-            "personalisation": "Q1 probes candidate's 7-year trajectory and end-to-end ownership claim; Q2 exploits dual Go/Node.js skill to probe decision-making; Q4 targets PostgreSQL specifically listed in her skills. Multiple questions reference her exact stack rather than generic prompts.",
-            "difficulty_fit": "Questions assume senior-level depth: exactly-once Kafka semantics (Q3), zero-downtime stateful Kubernetes rollout (Q5), full diagnostic for PostgreSQL degradation (Q4). Appropriately complex for 7 years experience at senior level.",
-            "coverage": "Clear labelled categories: 2 opening, 3 technical, 1 behavioural, 1 scenario, 1 closing. No near-duplicates despite multiple Kafka/PostgreSQL appearances — each targets a distinct concern.",
-            "clarity": "Each question is a single focused prompt. Q4 has a slight multi-part structure ('diagnostic and remediation') but remains coherent and answerable. All others are crisp."
+            "relevance": "All 8 questions map to stated skills (Go, Node.js, Kafka, PostgreSQL, Kubernetes) and responsibilities (microservices design, reliability ownership, mentoring). No off-role filler.",
+            "personalisation": "Q1 probes end-to-end ownership claim, Q2 probes dual Go/Node.js background, Q6 targets mentoring responsibility. Q5 uses Go+Kubernetes combo from resume. Multiple questions deliberately probe resume claims.",
+            "difficulty_fit": "Questions 3, 4, 7 require senior-level architectural reasoning (consumer lag remediation, 500M row scaling, data ownership in decomposition). Q5 is a senior on-call debug scenario. Consistently calibrated to senior level.",
+            "coverage": "Clear labels: 2 opening, 3 technical, 1 behavioural, 1 scenario, 1 closing. No near-duplicates detected across all 8 questions.",
+            "clarity": "Each question is a single focused prompt. Q7 is complex but remains one answerable scenario. No multi-part tangles."
           },
           "rubric": "question_bank"
         }
       ],
-      "ms": 14039
+      "ms": 14754
     },
     {
       "id": "question-012",
@@ -288,17 +288,17 @@
             {
               "order": "candidate-first",
               "winner": "A",
-              "reason": "Output B assumes specific details (Stripe, four-person team, specific projects) not provided in the task brief, making questions 1-3 potentially irrelevant or unanswerable. Output A uses only the stated background (Go, Node.js, PostgreSQL, Kafka, Kubernetes, gRPC, AWS, 7 years) and covers opening, technical depth, behavioural, scenario, and closing categories clearly. Output A's technical questions (exactly-once Kafka semantics, high-throughput PostgreSQL degradation, zero-downtime Kubernetes deployment) are appropriately senior and payments-relevant. Output B has stronger payments domain specificity (idempotency keys, double-entry ledger, settlement reconciliation) but the fabricated context undermines reliability. On balance, Output A is more dependably usable and criteria-compliant."
+              "reason": "Output B references specific details (Stripe, four-person team, payment retry system) not provided in the task brief, fabricating candidate history. Output A uses only the stated background. Both cover similar categories and senior depth. Output A's questions are clearly grounded in the listed skills (Go, Node.js, Kafka, PostgreSQL, Kubernetes) and probe senior-level judgment. Output B's technical questions (idempotency, double-entry ledger, settlement pipeline) are highly relevant to a payments company but the fabricated premises undermine validity. Output A wins on relevance-to-stated-background and accuracy without hallucination."
             },
             {
               "order": "baseline-first",
               "winner": "A",
-              "reason": "Output A is more tightly focused on the payments domain: idempotency keys, double-entry ledgers, settlement reconciliation, and card-network files are all payments-specific and directly relevant to a payments company role. Question 7 (settlement pipeline design) is a strong senior-level scenario unique to payments. Output B covers general microservices competencies (rolling deployments, query degradation, runtime choice) that are valid for any senior backend role but not payments-specific. Both use the candidate's stack well, but A's use of Kafka, PostgreSQL, and Go questions is framed around payment flows rather than generic distributed systems. Category coverage is comparable. On the criterion of 'relevance to the role' at a payments company, A wins clearly."
+              "reason": "Output A is strongly anchored in payments domain specifics (idempotency keys, double-entry ledger, card-network reconciliation, effectively-once Kafka semantics) and references concrete payments context (Stripe, settlement pipelines), directly satisfying relevance to a payments company role. Output B uses the candidate's listed skills (Go, Node.js, Kafka, PostgreSQL, Kubernetes) but the scenarios are generic senior engineering problems that could apply to any company—the Kafka lag question, PostgreSQL table growth question, and monolith decomposition scenario have no payments specificity. Both cover similar categories (opening, technical, behavioural, scenario, closing), but A's technical depth is payments-domain depth while B's is general distributed-systems depth. For a payments company role, A's questions will better reveal domain-relevant competencies. B's closing question is more candidate-centric which is a minor strength, but insufficient to overcome A's domain relevance advantage."
             }
           ]
         }
       ],
-      "ms": 20971
+      "ms": 23458
     },
     {
       "id": "question-013",
@@ -307,7 +307,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 40864
+      "ms": 50813
     },
     {
       "id": "answer-001",
@@ -316,7 +316,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 12551
+      "ms": 14845
     },
     {
       "id": "answer-002",
@@ -325,7 +325,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 11945
+      "ms": 14128
     },
     {
       "id": "answer-003",
@@ -334,7 +334,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 10478
+      "ms": 12797
     },
     {
       "id": "answer-004",
@@ -343,7 +343,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 10457
+      "ms": 12774
     },
     {
       "id": "answer-005",
@@ -352,7 +352,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 0
+      "ms": 21
     },
     {
       "id": "answer-006",
@@ -361,7 +361,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 9714
+      "ms": 12159
     },
     {
       "id": "answer-007",
@@ -370,7 +370,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 13042
+      "ms": 13958
     },
     {
       "id": "answer-008",
@@ -388,7 +388,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 11138
+      "ms": 13695
     },
     {
       "id": "answer-010",
@@ -409,21 +409,21 @@
         {
           "type": "rubric",
           "pass": true,
-          "mean": 3.67,
+          "mean": 4,
           "scores": {
             "grade_agreement": 3,
             "justification": 5,
-            "flag_accuracy": 3
+            "flag_accuracy": 4
           },
           "reasons": {
-            "grade_agreement": "Agent scored 1/10, reference band is 2-4/10. Just outside the band.",
-            "justification": "Agent caught no concrete mechanism, no real examples, and 'caching' being insufficient. Noted correct definition as barely adequate. Matches reference key points.",
-            "flag_accuracy": "Agent flagged 'vague' and 'no_examples' matching reference exactly, plus added 'overconfident' and 'evasive' which reference does not list."
+            "grade_agreement": "Agent scored 1/10; reference band is 2-4/10. Score is just outside the band.",
+            "justification": "Agent identifies no idempotency keys/dedup/constraints, caching not a strategy, no examples — matches all key weaknesses. Notes correct definition as a minor strength.",
+            "flag_accuracy": "Agent flagged 'vague','no_examples','evasive'; reference expects 'vague' and 'no_examples'. 'evasive' is a minor addition not in reference but not contradictory."
           },
           "rubric": "answer_evaluation"
         }
       ],
-      "ms": 8318
+      "ms": 10201
     },
     {
       "id": "report-001",
@@ -432,7 +432,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 36609
+      "ms": 48072
     },
     {
       "id": "report-002",
@@ -441,7 +441,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 37289
+      "ms": 40139
     },
     {
       "id": "report-003",
@@ -450,7 +450,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 37888
+      "ms": 42115
     },
     {
       "id": "report-004",
@@ -459,7 +459,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 0
+      "ms": 6647
     },
     {
       "id": "report-005",
@@ -468,7 +468,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 6817
+      "ms": 2424
     },
     {
       "id": "report-006",
@@ -477,7 +477,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 33687
+      "ms": 46549
     },
     {
       "id": "report-007",
@@ -486,7 +486,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 29422
+      "ms": 44125
     },
     {
       "id": "report-008",
@@ -495,7 +495,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 29421
+      "ms": 44125
     },
     {
       "id": "report-009",
@@ -517,10 +517,10 @@
           "type": "llm_judge",
           "pass": true,
           "score": 8,
-          "reason": "The narrative is coherent and well-structured, referencing the candidate (Priya Sharma) and role (Senior Software Engineer) throughout. It is specific in citing concrete evidence: idempotency keys with Redis, event sourcing with Kafka, missing Node.js and PostgreSQL coverage, communication scores of 7/10, and blameless post-mortems. It logically connects observations to conclusions and provides actionable next steps. Minor deduction for some repetition and the caveat that brevity of answers limits conclusions — which is itself a reasonable and specific observation."
+          "reason": "The narrative is coherent, well-structured, and consistently references the candidate by name (Priya Sharma) and her role (Senior Software Engineer / backend engineering). It is specific in citing concrete evidence: the idempotency/Redis answer, the Kafka/event sourcing response, the blameless post-mortem mention, the closing question about technical challenges, and the 7/10 uniform scoring pattern. It identifies specific JD skill gaps (Node.js, PostgreSQL) and articulates why they matter at a senior level. The recommendation is actionable and tied to the evidence. Minor weaknesses: the narrative does not name the specific role or company/JD beyond 'Senior Software Engineer,' and the causal logic around 'answer brevity' is slightly circular, but these do not undermine overall coherence or specificity."
         }
       ],
-      "ms": 9936
+      "ms": 12134
     },
     {
       "id": "report-011",
@@ -540,15 +540,15 @@
             "usefulness": 5
           },
           "reasons": {
-            "evidence": "Nearly every claim is grounded in direct quotes or specific scores: idempotency gap cites 'making sure things don't happen twice' and 'caching'; Kafka gap cites exact quote 'Kafka handles that for you with its settings, I think'; strengths cite the 15-minute EU outage, blameless post-mortem, canary stage, and 9/10 communication scores.",
-            "calibration": "Overall score of 52/100 and 'maybe' recommendation align with two strong questions (scores ~7-8 avg) and two weak questions (scores ~3-4 avg). Narrative explicitly maps per-answer scores to the verdict.",
-            "balance": "Report covers genuine strengths (incident management, communication, leadership) with specific evidence, and gaps with equal specificity and direct quotes. No unsupported praise or unwarranted harshness.",
-            "usefulness": "Clear verdict ('maybe'), concrete next steps (Kafka take-home, PostgreSQL/Node screen, targeted reference check, system design interview), and explicit conditions under which hire would be recommended."
+            "evidence": "Nearly every claim cites exact transcript quotes and sub-scores: idempotency gap cites 'we had some issues and used caching,' Kafka gap cites 'Kafka handles that for you with its settings, I think. We relied on the platform team,' incident strength cites 'blameless post-mortem after a 15-minute EU outage' with specific scores attached.",
+            "calibration": "Overall score of 53 and 'maybe' recommendation align with two low-scoring questions (avg ~3.67) and two higher-scoring ones (avg ~7.33), and the narrative explicitly ties the recommendation to the pattern of failed probes on required skills.",
+            "balance": "Report dedicates substantial space to genuine strengths (incident response scored 7/9/8, communication scores) while clearly articulating two concrete technical gaps with evidence; neither side is inflated or suppressed.",
+            "usefulness": "Provides a clear 'maybe' verdict with four concrete, sequenced next steps including a specific 60-minute technical screen topic, reference check focus, and code sample request — a hiring manager could act immediately."
           },
           "rubric": "report"
         }
       ],
-      "ms": 57167
+      "ms": 60996
     },
     {
       "id": "orch-001",
@@ -557,7 +557,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 33729
+      "ms": 36059
     },
     {
       "id": "orch-002",
@@ -566,7 +566,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 32262
+      "ms": 32499
     },
     {
       "id": "orch-003",
@@ -575,7 +575,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 36662
+      "ms": 35507
     },
     {
       "id": "orch-004",
@@ -584,7 +584,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 29005
+      "ms": 30377
     },
     {
       "id": "orch-005",
@@ -593,7 +593,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 33575
+      "ms": 34298
     },
     {
       "id": "orch-006",
@@ -602,7 +602,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 28923
+      "ms": 30569
     },
     {
       "id": "orch-007",
@@ -611,7 +611,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 39679
+      "ms": 36760
     },
     {
       "id": "orch-008",
@@ -620,7 +620,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 43583
+      "ms": 48620
     },
     {
       "id": "orch-009",
@@ -632,21 +632,21 @@
         {
           "type": "rubric",
           "pass": true,
-          "mean": 4.67,
+          "mean": 5,
           "scores": {
             "targets_gap": 5,
             "specificity": 5,
-            "neutrality": 4
+            "neutrality": 5
           },
           "reasons": {
-            "targets_gap": "Candidate mentioned 'caching' vaguely without explaining the actual mechanism; question directly asks for the technical mechanism of idempotency key generation/storage or duplicate handling",
-            "specificity": "Asks for concrete examples: idempotency key generation, storage, database/service layer handling",
-            "neutrality": "Neutral and professional, offers examples as prompts without leading to a specific correct answer"
+            "targets_gap": "Candidate gave no technical detail on how idempotency was implemented; follow-up directly asks for the mechanism, key generation/storage, and retry handling",
+            "specificity": "Asks for concrete details: key generation, storage layer, duplicate prevention at DB/broker level, retry behavior",
+            "neutrality": "Open-ended, no leading hints toward a specific correct answer, professional tone"
           },
           "rubric": "followup_question"
         }
       ],
-      "ms": 9698
+      "ms": 8222
     },
     {
       "id": "orch-010",
@@ -655,7 +655,7 @@
       "pass": true,
       "failures": [],
       "judge": [],
-      "ms": 31775
+      "ms": 30394
     },
     {
       "id": "memory-001",

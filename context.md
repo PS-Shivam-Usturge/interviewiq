@@ -26,6 +26,7 @@ An agentic AI interviewer. HR uploads a JD + resume; a **lead interviewer agent*
   - REPORT: `generate_final_report` (its assessment is passed to the report writer)
 - **Sub-agents** (single-turn, no tools; contracts in `backend/agents/contracts.js`): `parseAgent`, `questionAgent`, `answerAgent`, `reportAgent`.
 - **Context engineering** — `backend/agents/interviewMemory.js`: compact per-turn decisions, compaction after 6 turns, plan + concerns never dropped, pending follow-up tracked. Plus SDK session resume across turns (`sessions.agent_session_id`).
+- **Prompts** — `backend/prompts/`: Markdown templates per agent; `system.md` (role, rules, output format; orchestrator also has the per-phase tool policy) + `*.user.md` templates with `{{placeholders}}` filled by `render()`.
 - **Least privilege** — `backend/agentClient.js`: `tools: []`, `settingSources: []`, `strictMcpConfig`, per-phase `allowedTools`, deny-by-default `canUseTool`, timeout + retry, safe fallbacks.
 
 ## Access

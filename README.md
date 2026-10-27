@@ -506,6 +506,43 @@ Receives all scored answers, JD and resume summaries, the cross-question observa
 
 ---
 
+## Prompt design: system and user prompts
+
+Every prompt lives in a Markdown template in [`backend/prompts/`](backend/prompts/), never inline in agent code. Each agent has its own pair:
+
+| Part | Holds | Changes per call? |
+|---|---|---|
+| **System prompt** (`system.md`) | The agent's role, rules, output format, and for the orchestrator the **tool-usage policy for every phase** (which tool to call when) | No: fixed standing instructions |
+| **User prompt template** (`*.user.md`) | Only the task and data for this call, written with `{{placeholders}}` | Yes: filled at runtime |
+| **Partial blocks** (other `.md`) | Optional sections inserted into a user prompt only when relevant (e.g. the orchestrator's plan, resume claims, recorded concerns) | Included or left out |
+
+```
+backend/prompts/
+├── index.js                      prompt(name) + render(name, vars): fills {{placeholders}}, throws if one is missing
+├── orchestrator/                 system.md (role + tool policy) · setup/answer/report .user.md · memory, follow-up warning, report blocks
+├── parseAgent/                   jd.system/.user · resume.system/.user
+├── questionAgent/                system.md (role, difficulty guide, JSON format) · user.md · interviewer-plan.md
+├── answerAgent/                  system.md (scoring rules, JSON format) · user.md · resume-claims.md
+└── reportAgent/                  system.md (report rules, JSON format) · user.md · observations.md · assessment.md
+```
+
+How a call is built (example: the answer scorer):
+
+```js
+agentQuery(
+  render("answerAgent/user", { role_title, seniority, resume_claims, category, question, answer }),  // user prompt
+  { systemPrompt: prompt("answerAgent/system") },                                                    // system prompt
+);
+```
+
+- Templates are loaded once at startup, so a missing file fails immediately, not mid-interview.
+- A leading `<!-- … -->` comment documents each file's variables and is never sent to the model.
+- Values are inserted once and never re-scanned, so candidate text containing `{{…}}` stays literal.
+- The orchestrator steers sub-agents through **tool arguments**, not by writing their prompts: its `focus_areas`/strategy fill `questionAgent/interviewer-plan.md`, and its final assessment fills `reportAgent/assessment.md`.
+- Untrusted text (JD, resume, answers) only ever appears in user prompts; the system prompts state that it is data, never instructions (prompt-injection defence).
+
+---
+
 ## API endpoints
 
 All endpoints served from `http://localhost:3001`.
@@ -940,6 +977,7 @@ interviewiq/
 │   ├── cli.js                  # `interview-agent` CLI
 │   ├── .env.example            # Copy to .env, fill in keys
 │   ├── .npmrc                  # legacy-peer-deps (openai@4 vs zod@4 peer conflict)
+│   ├── prompts/                # system + user prompt templates (Markdown) per agent, render() formatter
 │   ├── a2a/
 │   │   ├── agentCard.js        # A2A agent card (skills, interface, security scheme)
 │   │   ├── executor.js         # A2A AgentExecutor → same session functions as the UI
